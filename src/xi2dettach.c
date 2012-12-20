@@ -182,21 +182,18 @@ static void event (Display *dpy)
 {
 	XEvent ev;
 
-	XFlush (dpy);
-	while (QLength (dpy) > 0) {
-		XNextEvent(dpy, &ev);
-		if (ev.xcookie.type == GenericEvent && ev.xcookie.extension == xi_opcode &&
-		    XGetEventData(dpy, &ev.xcookie)) {
-			//printf("Received event %d\n",ev.xcookie.evtype);
-			switch(ev.xcookie.evtype) {
-			case XI_HierarchyChanged:
-				process_hierarchy_event(dpy, (XIHierarchyEvent *)ev.xcookie.data);
-				break;
-			default:
-				fprintf(stderr, "other event.\n");
-			}
-			XFreeEventData(dpy, (XGenericEventCookie*)&ev);
+	XNextEvent(dpy, &ev);
+	if (ev.xcookie.type == GenericEvent && ev.xcookie.extension == xi_opcode &&
+	    XGetEventData(dpy, &ev.xcookie)) {
+		//printf("Received event %d\n",ev.xcookie.evtype);
+		switch(ev.xcookie.evtype) {
+		case XI_HierarchyChanged:
+			process_hierarchy_event(dpy, (XIHierarchyEvent *)ev.xcookie.data);
+			break;
+		default:
+			fprintf(stderr, "other event.\n");
 		}
+		XFreeEventData(dpy, (XGenericEventCookie*)&ev);
 	}
 }
 

@@ -27,17 +27,7 @@
 #include <X11/extensions/XInput.h>
 #include <X11/extensions/XInput2.h>
 
-///* Linux */
-//#include <linux/types.h>
-//#include <linux/input.h>
-//#include <linux/uhid.h>
-//
-///* Unix */
-//#include <sys/ioctl.h>
-//#include <sys/types.h>
-//#include <sys/stat.h>
-//#include <fcntl.h>
-//#include <unistd.h>
+/* Unix */
 #include <getopt.h>
 
 /* C */
@@ -221,18 +211,6 @@ int main(int argc, char **argv)
 	while (1) {
 		event(dpy);
 	}
-
-//	if (optind < argc) {
-//		hid_file = argv[optind++];
-//		fp = fopen(hid_file, "r");
-//	} else
-//		fp = stdin;
-
-//	if (!fp) {
-//		fprintf(stderr, "Failed to open %s: %s\n", hid_file, strerror(errno));
-//		return usage();
-//	}
-
 
 	return 0;
 }

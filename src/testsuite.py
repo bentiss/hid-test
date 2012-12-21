@@ -188,6 +188,13 @@ def test_hid(file):
 	tests.append((file, r))
 	return None
 
+def report_results(tests):
+	good = 0
+	for file, r in tests:
+		print file, "->", r
+		if r: good += 1
+	print good,'/', len(tests), 'tests passed'
+
 rootdir = '.'
 if len(sys.argv) > 1:
 	rootdir = sys.argv[1]
@@ -213,6 +220,5 @@ try:
 			if test_hid(file):
 				break
 finally:
-	for file, r in tests:
-		print file, "->", r
+	report_results(tests)
 

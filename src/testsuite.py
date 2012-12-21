@@ -52,12 +52,13 @@ def log_event(action, device):
 	if 'event' in device.sys_name:
 #		print action, device, device.sys_name
 		if action == 'add':
+			tmp = os.tmpfile()
+
 			# get node attributes
 			dev_path = "/dev/input/" + device.sys_name
 			subprocess.call(shlex.split("evemu-describe " + dev_path), stdout=tmp)
 
 			# start capturing events
-			tmp = os.tmpfile()
 			p = subprocess.Popen(shlex.split("evemu-record " + dev_path), stderr=None, stdout=tmp)
 
 			# store it for later

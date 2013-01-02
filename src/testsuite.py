@@ -106,21 +106,24 @@ def dump_outs(file, outs):
 			expected.write(l)
 
 def compare_result(file, name, expected, outs):
+	warning = False
 	if expected == None:
-		return False
+		return False, warning
 
 	if len(outs) != len(expected):
-		return False
+		return False, warning
 
 	for i in xrange(len(outs)):
 		out = outs[i]
 		expect = open(expected[i], 'r')
-		r = compare_evemu.compare_files(expect, out)
+		r, w = compare_evemu.compare_files(expect, out)
 		expect.close()
+		if w:
+			warning = True
 		if not r:
-			return False
+			return r, warning
 
-	return True
+	return True, warning
 
 def test_hid(file):
 	reset()
@@ -148,11 +151,15 @@ def test_hid(file):
 		outs.append(out)
 
 	# compare them
-	r = compare_result(file, name, results, outs)
+	r, w = compare_result(file, name, results, outs)
 
 	if not r:
-		# if there is a change, then dump the catptures in the current directory
+		# if there is a change, then dump the captures in the current directory
 		print "test failed, dumping outputs in:"
+		dump_outs(file, outs)
+	elif w:
+		# if there is a warning, still dump the captures in the current directory
+		print "success but warning raised, dumping outputs in:"
 		dump_outs(file, outs)
 	else:
 		print "success"
@@ -161,8 +168,9 @@ def test_hid(file):
 	for out in outs:
 		out.close()
 
-	# append the result of the test to the list
-	tests.append((file, r))
+	# append the result of the test to the list,
+	# we only count the warning if the test passed
+	tests.append((file, (r, w and r)))
 
 	print "----------------------------------------------------------------"
 
@@ -170,10 +178,16 @@ def test_hid(file):
 
 def report_results(tests):
 	good = 0
-	for file, r in tests:
-		print file, "->", r
+	warn = 0
+	for file, (r, w) in tests:
+		print file, "->", r,
+		if w:
+			print '(warning raised)'
+		else:
+			print ''
 		if r: good += 1
-	print good,'/', len(tests), 'tests passed'
+		if w: warn += 1
+	print good,'/', len(tests), 'tests passed (', warn, 'warnings )'
 
 # disable stdout buffering
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)

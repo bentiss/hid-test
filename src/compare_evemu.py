@@ -64,14 +64,16 @@ def parse_evemu(file):
 	return descr, frames
 
 def compare_files(expected, result):
+	''' returns ok, warning '''
 	last_expected = None
 	last_result = None
 	exp = parse_evemu(expected)
 	res = parse_evemu(result)
+	warning = False
 
 	if len(exp[0]) != len(res[0]):
 		print 'description differs, got', len(exp[0]), 'lines, instead of', len(res[0])
-		return False
+		return False, warning
 
 	for i in xrange(len(exp[0])):
 		if exp[0][i] != res[0][i]:
@@ -81,28 +83,29 @@ def compare_files(expected, result):
 			print exp[0][i],
 			if res[0][i].startswith('A: 2f 0'):
 				print 'This error is related to slot definition, it may be harmless, continuing...'
+				warning = True
 			else:
-				return False
+				return False, warning
 
 	if len(exp[1]) != len(res[1]):
 		if len(exp[1]) < len(res[1]):
 			print 'too many events, should get only', len(exp[1]), 'instead of', len(res[1])
 		else:
 			print 'too few events, should get ', len(exp[1]), 'instead of', len(res[1])
-		return False
+		return False, warning
 
 	for i in xrange(len(exp[1])):
 		exp_time, exp_line, exp_events = exp[1][i]
 		res_time, res_line, res_events = res[1][i]
 		if len(exp_events) != len(res_events):
 			print 'line', res_line, ', frame', i, ': got', len(res_events), 'events instead of', len(exp_events)
-			return False
+			return False, warning
 
 		for j in xrange(len(exp_events)):
 			r = res_events[j]
 			if r not in exp_events:
 				print 'line', res_line, ', frame', i, ':', "'" + r + "'", 'not in', exp_events
-				return False
+				return False, warning
 			index = exp_events.index(r)
 			del(exp_events[index])
 
@@ -118,9 +121,9 @@ def compare_files(expected, result):
 
 		if abs(exp_delta - res_delta) > 0.01:
 			print 'line', res_line, ', frame', i, ': timestamps differs too much ->', res_delta - exp_delta, 'at', res_time
-			return False
+			warning = True
 
-	return True
+	return True, warning
 
 if __name__ == '__main__':
 	print compare_files(open(sys.argv[1]), open(sys.argv[2]))

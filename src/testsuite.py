@@ -27,6 +27,7 @@ import sys
 import subprocess
 import shlex
 import threading
+import compare_evemu
 
 context = pyudev.Context()
 
@@ -93,34 +94,6 @@ def log_event(action, device):
 observer = pyudev.MonitorObserver(monitor, log_event)
 observer.start()
 
-def compare_files(expected, result):
-	last_expected = None
-	last_result = None
-	for l_expected in expected.readlines():
-		l_result = result.readline()
-		l_expected = l_expected.rstrip('\n')
-		l_result = l_result.rstrip('\n')
-		if l_result != l_expected:
-			if l_expected.startswith('E:'):
-				# slightly complicate because the times may not
-				# be exactly the same
-				e, exp_time, exp_data = l_expected.split(' ', 2)
-				e, res_time, res_data = l_result.split(' ', 2)
-				if not last_expected:
-					last_expected = float(exp_time)
-				if not last_result:
-					last_result = float(res_time)
-				exp_delta = float(exp_time) - last_expected
-				res_delta = float(res_time) - last_result
-
-				if exp_data != res_data or abs(exp_delta - res_delta) > 0.05:
-					print abs(exp_delta - res_delta), exp_data, res_data
-					return False
-			else:
-				print l_result, l_expected
-				return False
-	return True
-
 def dump_outs(file, outs):
 	hid_name = os.path.splitext(os.path.basename(file))[0]
 	for i in xrange(len(outs)):
@@ -142,7 +115,7 @@ def compare_result(file, name, expected, outs):
 	for i in xrange(len(outs)):
 		out = outs[i]
 		expect = open(expected[i], 'r')
-		r = compare_files(expect, out)
+		r = compare_evemu.compare_files(expect, out)
 		expect.close()
 		if not r:
 			return False

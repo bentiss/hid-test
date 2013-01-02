@@ -178,7 +178,10 @@ def test_hid(file):
 
 	if not r:
 		# if there is a change, then dump the catptures in the current directory
+		print "test failed, dumping outputs in:"
 		dump_outs(file, outs)
+	else:
+		print "success"
 
 	# close the captures so that the tmpfiles are destroyed
 	for out in outs:
@@ -186,6 +189,9 @@ def test_hid(file):
 
 	# append the result of the test to the list
 	tests.append((file, r))
+
+	print "----------------------------------------------------------------"
+
 	return None
 
 def report_results(tests):

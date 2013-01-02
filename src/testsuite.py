@@ -195,6 +195,9 @@ def report_results(tests):
 		if r: good += 1
 	print good,'/', len(tests), 'tests passed'
 
+# disable stdout buffering
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+
 rootdir = '.'
 if len(sys.argv) > 1:
 	rootdir = sys.argv[1]

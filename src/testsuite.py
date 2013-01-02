@@ -219,6 +219,7 @@ try:
 		for file in sys.argv[2:]:
 			test_hid(file)
 	else:
+		hid_files.sort()
 		for file in hid_files:
 			if test_hid(file):
 				break

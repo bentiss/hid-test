@@ -72,7 +72,7 @@ def compare_files(expected, result):
 	warning = False
 
 	if len(exp[0]) != len(res[0]):
-		print 'description differs, got', len(exp[0]), 'lines, instead of', len(res[0])
+		print 'description differs, got', len(res[0]), 'lines, instead of', len(exp[0])
 		return False, warning
 
 	for i in xrange(len(exp[0])):

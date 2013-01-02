@@ -125,6 +125,7 @@ def dump_outs(file, outs):
 	hid_name = os.path.splitext(os.path.basename(file))[0]
 	for i in xrange(len(outs)):
 		out = outs[i]
+		out.seek(0)
 		ev_name = hid_name + '_' + str(i) + ".ev"
 		print ev_name
 		expected = open(ev_name, 'w')

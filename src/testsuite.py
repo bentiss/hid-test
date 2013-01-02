@@ -135,6 +135,28 @@ def test_hid(file):
 				results = []
 			results.append(ev_file)
 
+	# In case there are several files, keep the right one
+	if results:
+		kernel_release = os.uname()[2]
+		_results = {}
+		for r in results:
+			basename = os.path.basename(r)
+			rkernel_release = os.path.basename(os.path.dirname(r)).rstrip('x')
+			if not rkernel_release.startswith('3.'):
+				rkernel_release = kernel_release
+			if kernel_release < rkernel_release:
+				# ignore dumps from earlier kernels
+				continue
+			if basename not in _results.keys():
+				_results[basename] = r
+			else:
+				current_kernel_release = os.path.basename(os.path.dirname(_results[basename])).rstrip('x')
+				if current_kernel_release < rkernel_release:
+					# overwrite the file only if the kernel release is earlier
+					_results[basename] = r
+		results = _results.values()
+		results.sort()
+
 	print "testing", file, "against", results
 	if subprocess.call(shlex.split(hid_replay + " -s 1 -1 " + file)):
 		return -1

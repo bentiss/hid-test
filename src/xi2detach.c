@@ -81,7 +81,7 @@ xinput_version(Display	*display)
 
 	/* Announce our supported version so the server treats us correctly. */
 	if (vers >= XI_2_Major) {
-		int maj = 2, min = 3;
+		int maj = 2, min = 0;
 
 		XIQueryVersion(display, &maj, &min);
 	}

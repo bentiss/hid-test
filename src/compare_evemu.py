@@ -34,14 +34,20 @@ def parse_evemu(file):
 	slot = 0
 	last_slot = 0
 	n = 1
+	slots_values = {0:{}}
+	slots_values_updated = []
+
+	def terminate_slot(slot):
+		if slots_values[slot].has_key('0039') and slots_values[slot]['0039'].endswith('-1'):
+			return
+		if len(slots_values_updated) == 0:
+			return
+		for k, v in slots_values[slot].items():
+			if k not in slots_values_updated:
+				frame.append(v)
 
 	def terminate_frame(n):
 		if len(frame) > 0:
-			# if the slot was not given, then add it to avoid
-			# missmatches if slots are not given in the very same order
-			str_slot = '0003 002f ' + str(last_slot)
-			if str_slot not in frame:
-				frame.append(str_slot)
 			frames.append((float(time), n, frame))
 		return []
 
@@ -50,12 +56,29 @@ def parse_evemu(file):
 			e, time, type, code, value = line.split(' ')
 			value = value.rstrip('\n')
 			if int(type, 16) == 0 and int(code, 16) == 0 and int(value, 16) == 0 :
+				if len(slots_values_updated) > 0:
+					terminate_slot(slot)
+				slots_values_updated = []
 				frame = terminate_frame(n)
-				last_slot = slot
-			elif int(type, 16) == 3 and int(code, 16) == 0x2f:
-				# slot value
-				slot = 0
 			else:
+				c = int(code, 16)
+				if int(type, 16) == 3 and c == 0x2f:
+					if len(slots_values_updated) > 0:
+						terminate_slot(slot)
+					# slot value
+					slot = value
+					if slot not in slots_values.keys():
+						slots_values[slot] = {}
+					slots_values_updated = []
+				if c >=  0x2f and c <= 0x3d:
+					if len(slots_values_updated) == 0 and int(type, 16) == 3 and c != 0x2f:
+						# if the slot was not given, then add it to avoid
+						# missmatches if slots are not given in the very same order
+						str_slot = '0003 002f ' + str(slot)
+						frame.append(str_slot)
+						slots_values_updated.append('002f')
+					slots_values_updated.append(code)
+					slots_values[slot][code] = ' '.join([type, code, value])
 				frame.append(' '.join([type, code, value]))
 		else:
 			descr.append(line)

@@ -126,6 +126,9 @@ def compare_files(expected, result):
 
 		for j in xrange(len(exp_events)):
 			r = res_events[j]
+			if r.startswith('0003 002f '):
+				# ignore slots, as they may be changed at each run
+				continue
 			if r not in exp_events:
 				print 'line', res_line, ', frame', i, ':', "'" + r + "'", 'not in', exp_events
 				return False, warning

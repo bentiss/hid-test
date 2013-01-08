@@ -173,7 +173,7 @@ def test_hid(file):
 		_results = {}
 		for r in results:
 			basename = os.path.basename(r)
-			rkernel_release = os.path.basename(os.path.dirname(r)).rstrip('x')
+			rkernel_release = os.path.basename(os.path.dirname(r)).rstrip('.x')
 			if not rkernel_release.startswith('3.'):
 				rkernel_release = kernel_release
 			if kernel_release < rkernel_release:
@@ -182,7 +182,7 @@ def test_hid(file):
 			if basename not in _results.keys():
 				_results[basename] = r
 			else:
-				current_kernel_release = os.path.basename(os.path.dirname(_results[basename])).rstrip('x')
+				current_kernel_release = os.path.basename(os.path.dirname(_results[basename])).rstrip('.x')
 				if current_kernel_release < rkernel_release:
 					# overwrite the file only if the kernel release is earlier
 					_results[basename] = r

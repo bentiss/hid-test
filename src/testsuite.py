@@ -105,6 +105,38 @@ def dump_outs(file, outs):
 		for l in out.readlines():
 			expected.write(l)
 
+def dump_diff(name, events_file):
+	events_file.seek(0)
+	descr, frames = compare_evemu.parse_evemu(events_file)
+	output = open(name, 'w')
+	f_number = 0
+	for d in descr:
+		output.write(d)
+	for time, n, frame, extras in frames:
+		f_number += 1
+		output.write('frame '+str(f_number) + ':\n')
+		for i in xrange(len(frame)):
+			end = '\n'
+			if i in extras:
+				end = '*\n'
+			output.write('    '+ frame[i] + end)
+	output.close()
+
+def dump_diffs(file, expected, outs):
+	hid_name = os.path.splitext(os.path.basename(file))[0]
+	for i in xrange(len(outs)):
+		ev_name = hid_name + '_res_' + str(i) + ".evd"
+		print ev_name
+		dump_diff(ev_name, outs[i])
+	if not expected:
+		return
+	for i in xrange(len(expected)):
+		ev_name = hid_name + '_exp_' + str(i) + ".evd"
+		print ev_name
+		expect = open(expected[i], 'r')
+		dump_diff(ev_name, expect)
+		expect.close()
+
 def compare_result(file, name, expected, outs):
 	warning = False
 	if expected == None:
@@ -179,6 +211,7 @@ def test_hid(file):
 		# if there is a change, then dump the captures in the current directory
 		print "test failed, dumping outputs in:"
 		dump_outs(file, outs)
+		dump_diffs(file, results, outs)
 	elif w:
 		# if there is a warning, still dump the captures in the current directory
 		print "success but warning raised, dumping outputs in:"

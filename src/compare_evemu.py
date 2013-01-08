@@ -36,6 +36,7 @@ def parse_evemu(file):
 	n = 1
 	slots_values = {0:{}}
 	slots_values_updated = []
+	extras = []
 
 	def terminate_slot(slot):
 		if slots_values[slot].has_key('0039') and slots_values[slot]['0039'].endswith('-1'):
@@ -44,11 +45,12 @@ def parse_evemu(file):
 			return
 		for k, v in slots_values[slot].items():
 			if k not in slots_values_updated:
+				extras.append(len(frame))
 				frame.append(v)
 
 	def terminate_frame(n):
 		if len(frame) > 0:
-			frames.append((float(time), n, frame))
+			frames.append((float(time), n, frame, extras))
 		return []
 
 	for line in file.readlines():
@@ -60,6 +62,7 @@ def parse_evemu(file):
 					terminate_slot(slot)
 				slots_values_updated = []
 				frame = terminate_frame(n)
+				extras = []
 			else:
 				c = int(code, 16)
 				if int(type, 16) == 3 and c == 0x2f:
@@ -75,6 +78,7 @@ def parse_evemu(file):
 						# if the slot was not given, then add it to avoid
 						# missmatches if slots are not given in the very same order
 						str_slot = '0003 002f ' + str(slot)
+						extras.append(len(frame))
 						frame.append(str_slot)
 						slots_values_updated.append('002f')
 					slots_values_updated.append(code)
@@ -118,10 +122,10 @@ def compare_files(expected, result):
 		return False, warning
 
 	for i in xrange(len(exp[1])):
-		exp_time, exp_line, exp_events = exp[1][i]
-		res_time, res_line, res_events = res[1][i]
+		exp_time, exp_line, exp_events, extras = exp[1][i]
+		res_time, res_line, res_events, extras = res[1][i]
 		if len(exp_events) != len(res_events):
-			print 'line', res_line, ', frame', i, ': got', len(res_events), 'events instead of', len(exp_events)
+			print 'line', res_line, ', frame', i + 1, ': got', len(res_events), 'events instead of', len(exp_events)
 			return False, warning
 
 		for j in xrange(len(exp_events)):

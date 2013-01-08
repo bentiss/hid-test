@@ -164,6 +164,14 @@ static void process_hierarchy_event(Display *dpy, XIHierarchyEvent *ev){
 		}
 
 		if (ev->info[i].flags & XISlaveAdded)
+			/*
+			 * Technically, we need to wait for the slave to be enabled
+			 * before we can detach it since it won't be attached until
+			 * it's enabled.
+			 * Unless the configuration is changed (AutoEnableDevices off)
+			 * we won't be able to send a request between 'add' and
+			 * 'enable' anyway, so not something to worry about now.
+			 */
 			detachSlave(dpy, id);
 	}
 }

@@ -1,16 +1,16 @@
 noinst_PROGRAMS =
 
-bin_PROGRAMS = xi2dettach
+bin_PROGRAMS = xi2detach
 
 INCLUDES=-I$(top_srcdir)/include/
 
 AM_CFLAGS = $(XINPUT_CFLAGS)
-xi2dettach_LDADD = $(XINPUT_LIBS)
+xi2detach_LDADD = $(XINPUT_LIBS)
 
 # man page generation
 if HAVE_DOCTOOLS
 # actual man pages
-man_pages_sources = xi2dettach.txt
+man_pages_sources = xi2detach.txt
 # shadow man pages
 man_pages_shadows =
 

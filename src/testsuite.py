@@ -204,7 +204,9 @@ class HIDTest(object):
 		self.expected = results
 
 		print "testing", self.path, "against", results
-		if subprocess.call(shlex.split(hid_replay + " -s 1 -1 " + self.path)):
+		p = subprocess.Popen(shlex.split(hid_replay + " -s 1 -1 " + self.path))
+
+		if p.wait():
 			return -1
 
 		# wait for all the captures to finish

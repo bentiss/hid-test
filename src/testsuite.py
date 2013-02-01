@@ -28,6 +28,7 @@ import subprocess
 import shlex
 import threading
 import compare_evemu
+import getopt
 
 context = pyudev.Context()
 
@@ -308,9 +309,16 @@ def report_results(tests):
 # disable stdout buffering
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
+optlist, args = getopt.gnu_getopt(sys.argv[1:], 'h')
+
+for opt, arg in optlist:
+	if opt == '-h':
+		print 'help me'
+		sys.exit(0)
+
 rootdir = '.'
-if len(sys.argv) > 1:
-	rootdir = sys.argv[1]
+if len(args) > 0:
+	rootdir = args[0]
 hid_files = []
 ev_files = []
 
@@ -330,8 +338,8 @@ try:
 	# if specific devices are given, treat them, otherwise, run the test on all .hid
 	hid_files.sort()
 	list_of_hid_files = hid_files
-	if len(sys.argv) > 2:
-		list_of_hid_files = sys.argv[2:]
+	if len(args) > 1:
+		list_of_hid_files = args[1:]
 
 	for file in list_of_hid_files:
 		currentRunningHidTest = HIDTest(file)

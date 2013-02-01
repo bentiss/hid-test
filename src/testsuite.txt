@@ -9,7 +9,7 @@ hid-testsuite - Regression tests suite for hid kernel drivers.
 
 SYNOPSIS
 --------
-*testsuite.py* DB_DIRECTORY [SPECIFIC_HID_RECORDING]...
+*testsuite.py* [OPTION] DB_DIRECTORY [SPECIFIC_HID_RECORDING]...
 
 DESCRIPTION
 -----------
@@ -35,6 +35,12 @@ CAUTION:
 While running the test suite, *hid-testsuite* will automatically call and terminate
 *xi2detach*(1). It is then not possible to plug and play with new input devices
 during the whole testing process.
+
+OPTIONS
+-------
+
+*-h*::
+	print the help message.
 
 PARAMETERS
 ----------

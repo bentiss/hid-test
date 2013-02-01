@@ -1,0 +1,39 @@
+XI2DETACH(1)
+============
+:doctype: manpage
+
+NAME
+----
+
+xi2detach - Utility that floats all new hotplugged device in X.org.
+
+SYNOPSIS
+--------
+*xi2detach*
+
+DESCRIPTION
+-----------
+*xi2detach* requires XInput 2.0.
+
+The purpose of *xi2detach* is to use it in all kind of tests were emulated
+input device are required. As the program disables any new kind of hotplugged
+device, the tool should _not_ be run without testing purposes in mind.
+For a more permanent configuration, look at the option *"AutoAddDevices"*
+in xorg.conf man page.
+
+EXIT CODE
+---------
+*hid-replay* returns EXIT_FAILURE on error.
+
+SEE ALSO
+--------
+testsuite.py(1)
+
+COPYRIGHT
+---------
+ Copyright 2012-2013, Benjamin Tissoires.
+ Copyright 2012-2013, Red Hat, Inc.
+
+AUTHOR
+------
+ Benjamin Tissoires <benjamin.tissoires@redhat.com>

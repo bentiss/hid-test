@@ -223,6 +223,9 @@ class HIDTest(object):
 		# acquire the lock so that only this test will get the udev 'add' notifications
 		global_lock.acquire()
 
+		global currentRunningHidTest
+		currentRunningHidTest = self
+
 		print "launching test", self.path, "against", results
 		p = subprocess.Popen(shlex.split(hid_replay + " -s 1 -1 " + self.path))
 
@@ -342,8 +345,7 @@ try:
 		list_of_hid_files = args[1:]
 
 	for file in list_of_hid_files:
-		currentRunningHidTest = HIDTest(file)
-		if currentRunningHidTest.run():
+		if HIDTest(file).run():
 			break
 finally:
 	report_results(tests)

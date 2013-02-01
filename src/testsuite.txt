@@ -9,7 +9,7 @@ hid-testsuite - Regression tests suite for hid kernel drivers.
 
 SYNOPSIS
 --------
-*testsuite.py* [OPTION] DB_DIRECTORY [SPECIFIC_HID_RECORDING]...
+*testsuite.py* [OPTION] [DB_DIRECTORY] [SPECIFIC_HID_RECORDING]...
 
 DESCRIPTION
 -----------
@@ -53,6 +53,8 @@ PARAMETERS
 	the tool will select the most recent file compatible with the current
 	running kernel. A tool running on a kernel 3.6.11 will ignore all
 	outputs from the directories 3.7.x/ and 3.8-next/.
+	If DIR_HID_FILES is omitted, the current working directory is assumed to
+	be the database path
 
 *SPECIFIC_HID_RECORDING*::
 	One or a list of HID records if the user wants to run only specific

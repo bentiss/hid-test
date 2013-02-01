@@ -90,7 +90,13 @@ def parse_evemu(file):
 	terminate_frame(n)
 	return descr, frames
 
-def compare_files(expected, result):
+def print_(str_result, line):
+	if str_result:
+		str_result.append(line)
+	else:
+		print line
+
+def compare_files(expected, result, str_result = None):
 	''' returns ok, warning '''
 	last_expected = None
 	last_result = None
@@ -99,33 +105,30 @@ def compare_files(expected, result):
 	warning = False
 
 	if len(exp[0]) != len(res[0]):
-		print 'description differs, got', len(res[0]), 'lines, instead of', len(exp[0])
+		print_(str_result, 'description differs, got ' + str(len(res[0])) + ' lines, instead of ' + str(len(exp[0])))
 		return False, warning
 
 	for i in xrange(len(exp[0])):
 		if exp[0][i] != res[0][i]:
-			print 'line', i + 1, ': error, got'
-			print res[0][i],
-			print 'instead of'
-			print exp[0][i],
+			print_(str_result, 'line ' + str(i + 1) + ': error, got ' + str(res[0][i]) + ' instead of ' + str(exp[0][i]))
 			if res[0][i].startswith('A: 2f 0'):
-				print 'This error is related to slot definition, it may be harmless, continuing...'
+				print_(str_result, 'This error is related to slot definition, it may be harmless, continuing...')
 				warning = True
 			else:
 				return False, warning
 
 	if len(exp[1]) != len(res[1]):
 		if len(exp[1]) < len(res[1]):
-			print 'too many events, should get only', len(exp[1]), 'instead of', len(res[1])
+			print_(str_result, 'too many events, should get only ' + str(len(exp[1])) + 'instead of ' + str(len(res[1])))
 		else:
-			print 'too few events, should get ', len(exp[1]), 'instead of', len(res[1])
+			print_(str_result, 'too few events, should get ' + str(len(exp[1])) + 'instead of ' + str(len(res[1])))
 		return False, warning
 
 	for i in xrange(len(exp[1])):
 		exp_time, exp_line, exp_events, extras = exp[1][i]
 		res_time, res_line, res_events, extras = res[1][i]
 		if len(exp_events) != len(res_events):
-			print 'line', res_line, ', frame', i + 1, ': got', len(res_events), 'events instead of', len(exp_events)
+			print_(str_result, 'line ' + str(res_line) + ', frame ' + str(i + 1) + ': got ' + str(len(res_events)) + 'events instead of ' + str(len(exp_events)))
 			return False, warning
 
 		for j in xrange(len(exp_events)):
@@ -134,7 +137,7 @@ def compare_files(expected, result):
 				# ignore slots, as they may be changed at each run
 				continue
 			if r not in exp_events:
-				print 'line', res_line, ', frame', i, ':', "'" + r + "'", 'not in', exp_events
+				print_(str_result, 'line ' + str(res_line) + ', frame ' + str(i) + ": '"  + str(r) + "' not in " + str(exp_events))
 				return False, warning
 			index = exp_events.index(r)
 			del(exp_events[index])
@@ -150,7 +153,7 @@ def compare_files(expected, result):
 		last_result = res_time
 
 		if abs(exp_delta - res_delta) > 0.01:
-			print 'line', res_line, ', frame', i, ': timestamps differs too much ->', res_delta - exp_delta, 'at', res_time
+			print_(str_result, 'line ' + str(res_line) + ', frame ' + str(i) + ': timestamps differs too much -> ' + str(res_delta - exp_delta) + ' at ' + str(res_time))
 			warning = True
 
 	return True, warning

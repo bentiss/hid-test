@@ -108,14 +108,16 @@ class HIDTest(object):
 
 	def dump_outs(self):
 		hid_name = os.path.splitext(os.path.basename(self.path))[0]
+		outfiles = []
 		for i in xrange(len(self.outs)):
 			out = self.outs[i]
 			out.seek(0)
 			ev_name = hid_name + '_' + str(i) + ".ev"
-			print ev_name
+			outfiles.append(ev_name)
 			expected = open(ev_name, 'w')
 			for l in out.readlines():
 				expected.write(l)
+		return outfiles
 
 	def dump_diff(self, name, events_file):
 		events_file.seek(0)
@@ -136,20 +138,22 @@ class HIDTest(object):
 
 	def dump_diffs(self):
 		hid_name = os.path.splitext(os.path.basename(self.path))[0]
+		outfiles = []
 		for i in xrange(len(self.outs)):
 			ev_name = hid_name + '_res_' + str(i) + ".evd"
-			print ev_name
+			outfiles.append(ev_name)
 			self.dump_diff(ev_name, self.outs[i])
 		if not self.expected:
-			return
+			return outfiles
 		for i in xrange(len(self.expected)):
 			ev_name = hid_name + '_exp_' + str(i) + ".evd"
-			print ev_name
+			outfiles.append(ev_name)
 			expect = open(self.expected[i], 'r')
 			self.dump_diff(ev_name, expect)
 			expect.close()
+		return outfiles
 
-	def compare_result(self):
+	def compare_result(self, str_result):
 		warning = False
 		if self.expected == None:
 			return False, warning
@@ -160,7 +164,7 @@ class HIDTest(object):
 		for i in xrange(len(self.outs)):
 			out = self.outs[i]
 			expect = open(self.expected[i], 'r')
-			r, w = compare_evemu.compare_files(expect, out)
+			r, w = compare_evemu.compare_files(expect, out, str_result)
 			expect.close()
 			if w:
 				warning = True
@@ -203,7 +207,7 @@ class HIDTest(object):
 
 		self.expected = results
 
-		print "testing", self.path, "against", results
+		print "launching test", self.path, "against", results
 		p = subprocess.Popen(shlex.split(hid_replay + " -s 1 -1 " + self.path))
 
 		if p.wait():
@@ -219,21 +223,28 @@ class HIDTest(object):
 		for sys_name, name, out in self.nodes_ready:
 			self.outs.append(out)
 
+		raw_length = 78
+		basename = os.path.basename(self.path)
+		name_length = len(basename) + 2
+		prev = (raw_length - name_length) / 2
+		after = raw_length - name_length - prev
+		str_result = [("-"*prev) + " " + basename + " " + ("-"*after)]
+
 		# compare them
-		r, w = self.compare_result()
+		r, w = self.compare_result(str_result)
 
 		if not r:
 			# if there is a change, then dump the captures in the current directory
-			print "test failed, dumping outputs in:"
-			self.dump_outs()
-			self.dump_diffs()
+			str_result.append("test failed, dumping outputs in:")
+			str_result.extend(self.dump_outs())
+			str_result.extend(self.dump_diffs())
 		elif w:
 			# if there is a warning, still dump the captures in the current directory
-			print "success but warning raised, dumping outputs in:"
-			self.dump_outs()
+			str_result.append("success but warning raised, dumping outputs in:")
+			str_result.extend(self.dump_outs())
 		else:
 #			self.dump_outs()
-			print "success"
+			str_result.append("success")
 
 		# close the captures so that the tmpfiles are destroyed
 		for out in self.outs:
@@ -243,7 +254,8 @@ class HIDTest(object):
 		# we only count the warning if the test passed
 		tests.append((self.path, (r, w and r)))
 
-		print "----------------------------------------------------------------"
+		str_result.append("-" * raw_length)
+		print '\n'.join(str_result)
 
 		return None
 

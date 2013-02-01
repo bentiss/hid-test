@@ -284,13 +284,13 @@ class HIDTest(object):
 		for out in self.outs:
 			out.close()
 
+		global_lock.acquire()
 		# append the result of the test to the list,
 		# we only count the warning if the test passed
 		tests.append((self.path, (r, w and r)))
 
 		str_result.append("-" * raw_length)
 
-		global_lock.acquire()
 		print '\n'.join(str_result)
 		global_lock.release()
 

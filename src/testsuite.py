@@ -308,16 +308,43 @@ def report_results(tests):
 		if r: good += 1
 		if w: warn += 1
 	print good,'/', len(tests), 'tests passed (', warn, 'warnings )'
+class HIDThread(threading.Thread):
+	count = 1
+	sema = None
+	ok = True
+	lock = threading.Lock()
+
+	def __init__(self, file):
+		threading.Thread.__init__(self)
+		HIDThread.lock.acquire()
+		if not HIDThread.sema:
+			HIDThread.sema = threading.Semaphore(HIDThread.count)
+		HIDThread.lock.release()
+
+		self.hid = HIDTest(file)
+
+	def run(self):
+		if HIDThread.ok:
+			HIDThread.sema.acquire()
+			if self.hid.run():
+				HIDThread.ok = False
+			HIDThread.sema.release()
+
 
 # disable stdout buffering
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
-optlist, args = getopt.gnu_getopt(sys.argv[1:], 'h')
+optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:')
 
 for opt, arg in optlist:
 	if opt == '-h':
 		print 'help me'
 		sys.exit(0)
+	elif opt == '-j':
+		HIDThread.count = int(arg)
+		if HIDThread.count < 1:
+			print "the number of threads can not be less than one. Disabling threading launches."
+			HIDThread.count = 1
 
 rootdir = '.'
 if len(args) > 0:
@@ -344,9 +371,17 @@ try:
 	if len(args) > 1:
 		list_of_hid_files = args[1:]
 
+	threads = []
 	for file in list_of_hid_files:
-		if HIDTest(file).run():
+		if HIDThread.count > 1:
+			thread = HIDThread(file)
+			threads.append(thread)
+			thread.start()
+		elif HIDTest(file).run():
 			break
+	if HIDThread.count > 1:
+		for thread in threads:
+			thread.join()
 finally:
 	report_results(tests)
 	xi2detach.terminate()

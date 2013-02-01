@@ -42,6 +42,10 @@ OPTIONS
 *-h*::
 	print the help message.
 
+*-jN*::
+	Launch N threads in parallel. This reduce the global time of the tests,
+	but corrupts the timestamps between frames.
+
 PARAMETERS
 ----------
 

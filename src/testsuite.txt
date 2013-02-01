@@ -95,13 +95,11 @@ OUTPUTS:
 Per test, the tool should produce the following output on a 3.8 kernel:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  testing /path_to_db/multitouch/win8/sharp_04dd_9681.hid against ['/path_to_db/expected_evemu/3.8-next/sharp_04dd_9681_0.ev']
- error: could not describe device
  success
 
 In case of a failure, it will output the following:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  testing /path_to_db/multitouch/win8/sharp_04dd_9681.hid against ['/path_to_db/expected_evemu/3.8-next/sharp_04dd_9681_0.ev']
- error: could not describe device
  too many events, should get only 2866 instead of 2878
  test failed, dumping outputs in:
  sharp_04dd_9681_0.ev

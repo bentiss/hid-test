@@ -56,7 +56,7 @@ def log_event(action, device):
 			subprocess.call(shlex.split("evemu-describe " + dev_path), stdout=tmp)
 
 			# start capturing events
-			p = subprocess.Popen(shlex.split("evemu-record " + dev_path), stderr=None, stdout=tmp)
+			p = subprocess.Popen(shlex.split("evemu-record " + dev_path), stderr=subprocess.PIPE, stdout=tmp)
 
 			# store it for later
 			nodes[device.sys_name] = tmp, p, currentRunningHidTest

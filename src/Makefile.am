@@ -10,7 +10,7 @@ xi2detach_LDADD = $(XINPUT_LIBS)
 # man page generation
 if HAVE_DOCTOOLS
 # actual man pages
-man_pages_sources = xi2detach.txt
+man_pages_sources = xi2detach.txt testsuite.txt
 # shadow man pages
 man_pages_shadows =
 

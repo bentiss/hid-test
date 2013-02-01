@@ -1,0 +1,155 @@
+HID-TESTSUITE(1)
+================
+:doctype: manpage
+
+NAME
+----
+
+hid-testsuite - Regression tests suite for hid kernel drivers.
+
+SYNOPSIS
+--------
+*testsuite.py* DB_DIRECTORY [SPECIFIC_HID_RECORDING]...
+
+DESCRIPTION
+-----------
+*hid-testsuite* requires evemu, hid-replay and the uhid kernel module (available in v3.6+).
+
+The purpose of *hid-testsuite* is to conduct regression tests for hid kernel
+drivers. It relies on *uhid* to inject HID report descriptors and HID events
+to simulate the plug and the behavior of any HID device. This part is realized
+by *hid-replay*(1).
+*hid-testsuite* then wait for the device node(s) to be created and starts
+reading the input events thanks to *evemu-record*.
+Once the events are injected and caught, it compares the output of evemu-record
+and the expected ones.
+In case of a failure (i.e. there is a semantic difference between the expected
+and actual outputs), it dumps the current recorded output in the current
+working directory. Moreover, it dumps two other files, the expected output and
+the actual output (files with *.evd* extension) in a format which allows a tool
+like diff to be useful.
+
+PARAMETERS
+----------
+
+*DIR_HID_FILES*::
+	Directory containing hid dumps from *hid-recorder* and expected outputs
+	form the same hid files.
+	If several expected outputs are found, the later is taken. In case the
+	outputs are organised by kernel version (e.g. 3.6.x/ 3.7.x/ 3.8-next/),
+	the tool will select the most recent file compatible with the current
+	running kernel. A tool running on a kernel 3.6.11 will ignore all
+	outputs from the directories 3.7.x/ and 3.8-next/.
+
+*SPECIFIC_HID_RECORDING*::
+	One or a list of HID records if the user wants to run only specific
+	tests and not the entire database.
+
+EXAMPLE DATABASE
+----------------
+
+The upstream database can be retrieved at: <https://github.com/bentiss/hid-devices>
+
+The example database is organized as the following:
+
+ /path_to_db/
+ |-- expected_evemu
+ |   |-- 3.6.x
+ |   |   |-- 3m_0596_0500_0.ev
+ |   |   |-- ...
+ |   |   `-- zytronic_14c8_0005_0.ev
+ |   |-- 3.7.x
+ |   |   |-- flatfrog_25b5_0002_0.ev
+ |   |   |-- ...
+ |   |   `-- trs-star_238f_0001_0.ev
+ |   |-- 3.8-next
+ |   |   |-- advanced-silicon_2619_5610_0.ev
+ |   |   |-- ...
+ |   |   `-- sharp_04dd_9681_0.ev
+ |-- multitouch
+ |   |-- win7
+ |   |   |-- 3m_0596_0500.hid
+ |   |   |-- ...
+ |   |   |-- flatfrog_25b5_0002.hid
+ |   |   |-- ...
+ |   |   |-- trs-star_238f_0001.hid
+ |   |   `-- zytronic_14c8_0005.hid
+ |   `-- win8
+ |       |-- advanced-silicon_2619_5610.hid
+ |       |-- ...
+ |       `-- sharp_04dd_9681.hid
+ `-- pen_touch
+     `-- win8
+         `-- n-trig_1b96_0c01.hid
+
+OUTPUTS:
+--------
+
+Per test, the tool should produce the following output on a 3.8 kernel:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ testing /path_to_db/multitouch/win8/sharp_04dd_9681.hid against ['/path_to_db/expected_evemu/3.8-next/sharp_04dd_9681_0.ev']
+ error: could not describe device
+ success
+
+In case of a failure, it will output the following:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ testing /path_to_db/multitouch/win8/sharp_04dd_9681.hid against ['/path_to_db/expected_evemu/3.8-next/sharp_04dd_9681_0.ev']
+ error: could not describe device
+ too many events, should get only 2866 instead of 2878
+ test failed, dumping outputs in:
+ sharp_04dd_9681_0.ev
+ sharp_04dd_9681_res_0.evd
+ sharp_04dd_9681_exp_0.evd
+
+At the end of the output, a summary is printed, a per-test results and the global result:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ /path_to_db/multitouch/win8/sharp_04dd_9681.hid -> False 
+ 0 / 1 tests passed ( 0 warnings )
+
+INPUT FILE
+----------
+
+See *hid-replay*(1) man page.
+
+OUTPUT FILES
+------------
+
+*.ev:
+~~~~~
+
+See *evemu-describe*(1) man page.
+
+*.evd:
+~~~~~~
+
+The output *.evd files of *hid-testsuite* has the following syntax:
+
+- *N* same purspose as *evemu-describe*
+- *I* same purspose as *evemu-describe*
+- *P* same purspose as *evemu-describe*
+- *B* same purspose as *evemu-describe*
+- *A* same purspose as *evemu-describe*
+- *frame N* indicates we have received a new input sequence mqrked by EV_SYN
+- *type code value* (in hexadecimal) are events, as in *evemu-record* but without the timestamp
+
+Some values of events have a star (*) attached to them. It means that the event
+was not actually caught by evemu-record but added by the testsuite to complete
+the current state of each event.
+
+EXIT CODE
+---------
+*hid-replay* returns EXIT_FAILURE on error.
+
+SEE ALSO
+--------
+xi2dettach(1) hid-recorder(1) hid-replay(1) evemu-describe(1)
+
+
+COPYRIGHT
+---------
+ Copyright 2012-2013, Benjamin Tissoires.
+ Copyright 2012-2013, Red Hat, Inc.
+
+AUTHOR
+------
+ Benjamin Tissoires <benjamin.tissoires@redhat.com>

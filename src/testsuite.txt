@@ -29,6 +29,13 @@ working directory. Moreover, it dumps two other files, the expected output and
 the actual output (files with *.evd* extension) in a format which allows a tool
 like diff to be useful.
 
+CAUTION:
+--------
+
+While running the test suite, *hid-testsuite* will automatically call and terminate
+*xi2detach*(1). It is then not possible to plug and play with new input devices
+during the whole testing process.
+
 PARAMETERS
 ----------
 

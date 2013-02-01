@@ -253,6 +253,9 @@ if len(sys.argv) > 1:
 hid_files = []
 ev_files = []
 
+# starts xi2dettach
+xi2detach = subprocess.Popen(shlex.split(os.path.join(os.path.dirname(sys.argv[0]), 'xi2detach')), stderr= subprocess.PIPE, stdout= subprocess.PIPE)
+
 # first, retrieve all the .hid and .ev files in rootdir (first arg if given, otherwise, cwd)
 for root, dirs, files in os.walk(rootdir):
 	for f in files:
@@ -274,4 +277,5 @@ try:
 				break
 finally:
 	report_results(tests)
+	xi2detach.terminate()
 

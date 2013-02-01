@@ -328,16 +328,15 @@ for root, dirs, files in os.walk(rootdir):
 
 try:
 	# if specific devices are given, treat them, otherwise, run the test on all .hid
+	hid_files.sort()
+	list_of_hid_files = hid_files
 	if len(sys.argv) > 2:
-		for file in sys.argv[2:]:
-			currentRunningHidTest = HIDTest(file)
-			currentRunningHidTest.run()
-	else:
-		hid_files.sort()
-		for file in hid_files:
-			currentRunningHidTest = HIDTest(file)
-			if currentRunningHidTest.run():
-				break
+		list_of_hid_files = sys.argv[2:]
+
+	for file in list_of_hid_files:
+		currentRunningHidTest = HIDTest(file)
+		if currentRunningHidTest.run():
+			break
 finally:
 	report_results(tests)
 	xi2detach.terminate()

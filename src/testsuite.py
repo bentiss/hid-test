@@ -42,6 +42,11 @@ global currentRunningHidTest
 currentRunningHidTest = None
 nodes = {}
 
+global_lock = threading.Lock()
+global_condition = threading.Condition()
+global_condition_op = False
+
+
 def log_event(action, device):
 	if 'event' in device.sys_name:
 #		print action, device, device.sys_name
@@ -61,6 +66,13 @@ def log_event(action, device):
 			# store it for later
 			nodes[device.sys_name] = tmp, p, currentRunningHidTest
 			currentRunningHidTest.nodes[device.sys_name] = tmp, p, currentRunningHidTest
+
+			# notify the current hid test that one device has been added
+			global_condition.acquire()
+			global global_condition_op
+			global_condition_op = True
+			global_condition.notify()
+			global_condition.release()
 
 		elif action == 'remove':
 			# get corresponding capturing process in background
@@ -207,8 +219,26 @@ class HIDTest(object):
 
 		self.expected = results
 
+		# acquire the lock so that only this test will get the udev 'add' notifications
+		global_lock.acquire()
+
 		print "launching test", self.path, "against", results
 		p = subprocess.Popen(shlex.split(hid_replay + " -s 1 -1 " + self.path))
+
+		# wait for one device to be added
+		global_condition.acquire()
+		global global_condition_op
+		if not global_condition_op:
+			global_condition.wait()
+		global_condition_op = False
+		global_condition.release()
+
+		# wait 2 more seconds before releasing the lock, in case others
+		# devices appears
+		time.sleep(2)
+
+		# now other tests can be notified by udev
+		global_lock.release()
 
 		if p.wait():
 			return -1
@@ -255,7 +285,10 @@ class HIDTest(object):
 		tests.append((self.path, (r, w and r)))
 
 		str_result.append("-" * raw_length)
+
+		global_lock.acquire()
 		print '\n'.join(str_result)
+		global_lock.release()
 
 		return None
 

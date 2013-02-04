@@ -397,8 +397,10 @@ try:
 	while len(threads) > 0:
 		try:
 			# Join all threads using a timeout so it doesn't block
-			# Filter out threads which have been joined or are None
-			threads = [t.join(1) for t in threads if t is not None and t.isAlive()]
+			t = threads.pop(0)
+			t.join(1)
+			if t.isAlive():
+				threads.append(t)
 		except KeyboardInterrupt:
 			print "Ctrl-c received! Sending kill to threads..."
 			HIDTest.run = False

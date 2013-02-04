@@ -111,6 +111,7 @@ class HIDTest(object):
 	def __init__(self, path):
 		self.path = path
 		self.reset()
+		self.hid_replay = None
 
 	def reset(self):
 		self.nodes = {}
@@ -227,7 +228,7 @@ class HIDTest(object):
 		currentRunningHidTest = self
 
 		print "launching test", self.path, "against", results
-		p = subprocess.Popen(shlex.split(hid_replay + " -s 1 -1 " + self.path))
+		self.hid_replay = subprocess.Popen(shlex.split(hid_replay + " -s 1 -1 " + self.path))
 
 		# wait for one device to be added
 		global_condition.acquire()
@@ -244,8 +245,10 @@ class HIDTest(object):
 		# now other tests can be notified by udev
 		global_lock.release()
 
-		if p.wait():
+		if self.hid_replay.wait():
 			return -1
+
+		self.hid_replay = None
 
 		# wait for all the captures to finish
 		self.cv.acquire()

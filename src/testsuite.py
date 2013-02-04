@@ -324,11 +324,10 @@ class HIDThread(threading.Thread):
 		self.hid = HIDTest(file)
 
 	def run(self):
-		if HIDThread.ok:
-			HIDThread.sema.acquire()
-			if self.hid.run():
-				HIDThread.ok = False
-			HIDThread.sema.release()
+		HIDThread.sema.acquire()
+		if HIDThread.ok and self.hid.run():
+			HIDThread.ok = False
+		HIDThread.sema.release()
 
 
 # disable stdout buffering

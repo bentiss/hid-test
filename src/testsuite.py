@@ -108,6 +108,7 @@ observer.start()
 tests = []
 
 class HIDTest(object):
+	run = True
 	def __init__(self, path):
 		self.path = path
 		self.reset()
@@ -187,6 +188,10 @@ class HIDTest(object):
 
 		return True, warning
 
+	def terminate(self):
+		if self.hid_replay :
+			self.hid_replay.terminate()
+
 	def run(self):
 		self.reset()
 		results = None
@@ -223,6 +228,10 @@ class HIDTest(object):
 
 		# acquire the lock so that only this test will get the udev 'add' notifications
 		global_lock.acquire()
+
+		if not HIDTest.run:
+			global_lock.release()
+			return -1
 
 		global currentRunningHidTest
 		currentRunningHidTest = self
@@ -323,6 +332,7 @@ class HIDThread(threading.Thread):
 		if not HIDThread.sema:
 			HIDThread.sema = threading.Semaphore(HIDThread.count)
 		HIDThread.lock.release()
+		self.daemon = True
 
 		self.hid = HIDTest(file)
 
@@ -331,6 +341,9 @@ class HIDThread(threading.Thread):
 		if HIDThread.ok and self.hid.run():
 			HIDThread.ok = False
 		HIDThread.sema.release()
+
+	def terminate(self):
+		self.hid.terminate()
 
 
 # disable stdout buffering
@@ -381,9 +394,17 @@ try:
 			thread.start()
 		elif HIDTest(file).run():
 			break
-	if HIDThread.count > 1:
-		for thread in threads:
-			thread.join()
+	while len(threads) > 0:
+		try:
+			# Join all threads using a timeout so it doesn't block
+			# Filter out threads which have been joined or are None
+			threads = [t.join(1) for t in threads if t is not None and t.isAlive()]
+		except KeyboardInterrupt:
+			print "Ctrl-c received! Sending kill to threads..."
+			HIDTest.run = False
+			HIDThread.ok = False
+			for t in threads:
+				t.terminate()
 finally:
 	report_results(tests)
 	xi2detach.terminate()

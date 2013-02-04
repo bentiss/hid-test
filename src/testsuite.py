@@ -237,9 +237,9 @@ class HIDTest(object):
 		global_condition_op = False
 		global_condition.release()
 
-		# wait 2 more seconds before releasing the lock, in case others
-		# devices appears
-		time.sleep(2)
+		# wait 1 more second before releasing the lock, in case others
+		# devices appear
+		time.sleep(1)
 
 		# now other tests can be notified by udev
 		global_lock.release()

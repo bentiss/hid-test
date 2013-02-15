@@ -108,7 +108,7 @@ observer.start()
 tests = []
 
 class HIDTest(object):
-	run = True
+	running = True
 	def __init__(self, path):
 		self.path = path
 		self.reset()
@@ -229,7 +229,7 @@ class HIDTest(object):
 		# acquire the lock so that only this test will get the udev 'add' notifications
 		global_lock.acquire()
 
-		if not HIDTest.run:
+		if not HIDTest.running:
 			global_lock.release()
 			return -1
 
@@ -407,7 +407,7 @@ try:
 				threads.append(t)
 		except KeyboardInterrupt:
 			print "Ctrl-c received! Sending kill to threads..."
-			HIDTest.run = False
+			HIDTest.running = False
 			HIDThread.ok = False
 			for t in threads:
 				t.terminate()

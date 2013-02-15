@@ -119,16 +119,16 @@ def compare_files(expected, result, str_result = None):
 
 	if len(exp[1]) != len(res[1]):
 		if len(exp[1]) < len(res[1]):
-			print_(str_result, 'too many events, should get only ' + str(len(exp[1])) + 'instead of ' + str(len(res[1])))
+			print_(str_result, 'too many events, should get only ' + str(len(exp[1])) + ' events instead of ' + str(len(res[1])))
 		else:
-			print_(str_result, 'too few events, should get ' + str(len(exp[1])) + 'instead of ' + str(len(res[1])))
+			print_(str_result, 'too few events, should get ' + str(len(exp[1])) + ' events instead of ' + str(len(res[1])))
 		return False, warning
 
 	for i in xrange(len(exp[1])):
 		exp_time, exp_line, exp_events, extras = exp[1][i]
 		res_time, res_line, res_events, extras = res[1][i]
 		if len(exp_events) != len(res_events):
-			print_(str_result, 'line ' + str(res_line) + ', frame ' + str(i + 1) + ': got ' + str(len(res_events)) + 'events instead of ' + str(len(exp_events)))
+			print_(str_result, 'line ' + str(res_line) + ', frame ' + str(i + 1) + ': got ' + str(len(res_events)) + ' events instead of ' + str(len(exp_events)))
 			return False, warning
 
 		for j in xrange(len(exp_events)):

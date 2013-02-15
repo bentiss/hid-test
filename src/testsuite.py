@@ -361,6 +361,10 @@ for opt, arg in optlist:
 			print "the number of threads can not be less than one. Disabling threading launches."
 			HIDThread.count = 1
 
+if not os.path.exists("/dev/uhid"):
+	print "It is required to load the uhid kernel module."
+	sys.exit(1)
+
 rootdir = '.'
 if len(args) > 0:
 	rootdir = args[0]

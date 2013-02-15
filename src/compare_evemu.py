@@ -158,5 +158,25 @@ def compare_files(expected, result, str_result = None):
 
 	return True, warning
 
+def compare_sets(expected_list, result_list, str_result = None):
+	warning = False
+	if expected_list == None:
+		return False, warning
+
+	if len(result_list) != len(expected_list):
+		return False, warning
+
+	for i in xrange(len(result_list)):
+		out = result_list[i]
+		expect = open(expected_list[i], 'r')
+		r, w = compare_files(expect, out, str_result)
+		expect.close()
+		if w:
+			warning = True
+		if not r:
+			return r, warning
+
+	return True, warning
+
 if __name__ == '__main__':
 	print compare_files(open(sys.argv[1]), open(sys.argv[2]))

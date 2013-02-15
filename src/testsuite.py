@@ -169,24 +169,7 @@ class HIDTest(object):
 		return outfiles
 
 	def compare_result(self, str_result):
-		warning = False
-		if self.expected == None:
-			return False, warning
-
-		if len(self.outs) != len(self.expected):
-			return False, warning
-
-		for i in xrange(len(self.outs)):
-			out = self.outs[i]
-			expect = open(self.expected[i], 'r')
-			r, w = compare_evemu.compare_files(expect, out, str_result)
-			expect.close()
-			if w:
-				warning = True
-			if not r:
-				return r, warning
-
-		return True, warning
+		return compare_evemu.compare_sets(self.expected, self.outs, str_result)
 
 	def terminate(self):
 		if self.hid_replay :

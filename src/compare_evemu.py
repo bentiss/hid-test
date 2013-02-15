@@ -104,6 +104,14 @@ def parse_evemu(file):
 	if len(slots_values_updated) > 0:
 		terminate_slot(slot)
 	terminate_frame(n)
+
+	if len(frames) == 1:
+		time, n, frame, extras = frames[0]
+		if len(frame) == 1 and frame[0] == '0000 0000 1':
+			# all keys up event sent on disconnect
+			# that means that no events were sent, we can drop the
+			# results
+			frames = []
 	return descr, frames
 
 def print_(str_result, line):

@@ -37,6 +37,8 @@ def parse_evemu(file):
 	slots_values = {0:{}}
 	slots_values_updated = []
 	extras = []
+	values = {}
+	values_updated = []
 
 	def terminate_slot(slot):
 		if slots_values[slot].has_key('0039') and slots_values[slot]['0039'].endswith('-1'):
@@ -49,6 +51,10 @@ def parse_evemu(file):
 				frame.append(v)
 
 	def terminate_frame(n):
+		for k, v in values.items():
+			if k not in values_updated:
+				extras.append(len(frame))
+				frame.append(v)
 		if len(frame) > 0:
 			frames.append((float(time), n, frame, extras))
 		return []
@@ -58,31 +64,39 @@ def parse_evemu(file):
 			e, time, type, code, value = line.split(' ')
 			value = value.rstrip('\n')
 			if int(type, 16) == 0 and int(code, 16) == 0 and int(value, 16) == 0 :
+				# EV_SYN
 				if len(slots_values_updated) > 0:
 					terminate_slot(slot)
 				slots_values_updated = []
 				frame = terminate_frame(n)
+				values_updated = []
 				extras = []
 			else:
 				c = int(code, 16)
-				if int(type, 16) == 3 and c == 0x2f:
-					if len(slots_values_updated) > 0:
-						terminate_slot(slot)
-					# slot value
-					slot = value
-					if slot not in slots_values.keys():
-						slots_values[slot] = {}
-					slots_values_updated = []
-				if c >=  0x2f and c <= 0x3d:
-					if len(slots_values_updated) == 0 and int(type, 16) == 3 and c != 0x2f:
-						# if the slot was not given, then add it to avoid
-						# missmatches if slots are not given in the very same order
-						str_slot = '0003 002f ' + str(slot)
-						extras.append(len(frame))
-						frame.append(str_slot)
-						slots_values_updated.append('002f')
-					slots_values_updated.append(code)
-					slots_values[slot][code] = ' '.join([type, code, value])
+				if int(type, 16) == 3:
+					# absolute event
+					if c >=  0x2f and c <= 0x3d:
+						# MT event
+						if c == 0x2f:
+							if len(slots_values_updated) > 0:
+								terminate_slot(slot)
+							# slot value
+							slot = value
+							if slot not in slots_values.keys():
+								slots_values[slot] = {}
+							slots_values_updated = []
+						elif len(slots_values_updated) == 0:
+							# if the slot was not given, then add it to avoid
+							# missmatches if slots are not given in the very same order
+							str_slot = '0003 002f ' + str(slot)
+							extras.append(len(frame))
+							frame.append(str_slot)
+							slots_values_updated.append('002f')
+						slots_values_updated.append(code)
+						slots_values[slot][code] = ' '.join([type, code, value])
+					else:
+						values_updated.append(code)
+						values[code] = ' '.join([type, code, value])
 				frame.append(' '.join([type, code, value]))
 		else:
 			descr.append(line)

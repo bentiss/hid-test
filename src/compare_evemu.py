@@ -101,6 +101,8 @@ def parse_evemu(file):
 		else:
 			descr.append(line)
 		n += 1
+	if len(slots_values_updated) > 0:
+		terminate_slot(slot)
 	terminate_frame(n)
 	return descr, frames
 

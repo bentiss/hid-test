@@ -120,12 +120,21 @@ def print_(str_result, line):
 	else:
 		print line
 
-def compare_files(expected, result, str_result = None):
+def compare_desc(expected, result):
+	if len(expected) != len(result):
+		return False
+
+	for i in xrange(len(expected)):
+		if expected[i] != result[i]:
+			if not expected[i].startswith('A: 2f 0'):
+				return False
+
+	return True
+
+def compare_files(exp, res, str_result = None):
 	''' returns ok, warning '''
 	last_expected = None
 	last_result = None
-	exp = parse_evemu(expected)
-	res = parse_evemu(result)
 	warning = False
 
 	if len(exp[0]) != len(res[0]):
@@ -184,23 +193,51 @@ def compare_files(expected, result, str_result = None):
 
 def compare_sets(expected_list, result_list, str_result = None):
 	warning = False
+	matches = True
 	if expected_list == None:
 		return False, warning
 
-	if len(result_list) != len(expected_list):
+	# parse both sets
+	res_list = [ parse_evemu(res) for res in result_list]
+	files_exp_list = [ open(exp, 'r') for exp in expected_list]
+	exp_list = [ parse_evemu(exp) for exp in files_exp_list]
+	for f in files_exp_list:
+		f.close()
+
+	i = 0
+	found = False
+	for res in res_list:
+		prefix = 'output #' + str(i) + ': '
+		if len(res_list) == 1:
+			prefix = ''
+		desc, data = res
+		exp = None
+		for exp_item in exp_list:
+			exp_desc, d = exp_item
+			if compare_desc(desc, exp_desc):
+				exp = exp_item
+				break
+
+		if not exp:
+			print_(str_result, prefix + 'no matching device')
+			warning = True
+			if len(data) > 0:
+				matches = False
+				print_(str_result, prefix + str(len(data)) + ' events received -> test failed')
+			else:
+				print_(str_result, prefix + 'no events received -> ignoring')
+		else:
+			found = True
+			r, w = compare_files(exp, res, str_result)
+			warning = warning or w
+			matches = matches and r
+
+		i += 1
+
+	if not found:
 		return False, warning
 
-	for i in xrange(len(result_list)):
-		out = result_list[i]
-		expect = open(expected_list[i], 'r')
-		r, w = compare_files(expect, out, str_result)
-		expect.close()
-		if w:
-			warning = True
-		if not r:
-			return r, warning
-
-	return True, warning
+	return matches, warning
 
 if __name__ == '__main__':
-	print compare_files(open(sys.argv[1]), open(sys.argv[2]))
+	print compare_files(parse_evemu(open(sys.argv[1])), parse_evemu(open(sys.argv[2])))

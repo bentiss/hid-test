@@ -63,12 +63,17 @@ def parse_evemu(file):
 		if line.startswith('E:'):
 			e, time, type, code, value = line.split(' ')
 			value = value.rstrip('\n')
-			if int(type, 16) == 0 and int(code, 16) == 0 and int(value, 16) == 0 :
-				# EV_SYN
-				if len(slots_values_updated) > 0:
-					terminate_slot(slot)
+			if int(type, 16) == 0 and int(code, 16) == 0:
+				v = int(value, 16)
+				if v == 0 :
+					# EV_SYN
+					if len(slots_values_updated) > 0:
+						terminate_slot(slot)
+					frame = terminate_frame(n)
+				elif v == 1:
+					# Key repeat event, drop previous received keys
+					frame = [ f for f in frame if not f.startswith('0001 ')]
 				slots_values_updated = []
-				frame = terminate_frame(n)
 				values_updated = []
 				extras = []
 			else:

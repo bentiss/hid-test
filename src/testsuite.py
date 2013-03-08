@@ -109,10 +109,11 @@ tests = []
 
 class HIDTest(object):
 	running = True
-	def __init__(self, path):
+	def __init__(self, path, delta_timestamp):
 		self.path = path
 		self.reset()
 		self.hid_replay = None
+		self.delta_timestamp = delta_timestamp
 
 	def reset(self):
 		self.nodes = {}
@@ -169,7 +170,7 @@ class HIDTest(object):
 		return outfiles
 
 	def compare_result(self, str_result):
-		return compare_evemu.compare_sets(self.expected, self.outs, str_result)
+		return compare_evemu.compare_sets(self.expected, self.outs, str_result, self.delta_timestamp)
 
 	def terminate(self):
 		if self.hid_replay :
@@ -309,7 +310,7 @@ class HIDThread(threading.Thread):
 	ok = True
 	lock = threading.Lock()
 
-	def __init__(self, file):
+	def __init__(self, file, delta_timestamp):
 		threading.Thread.__init__(self)
 		HIDThread.lock.acquire()
 		if not HIDThread.sema:
@@ -317,7 +318,7 @@ class HIDThread(threading.Thread):
 		HIDThread.lock.release()
 		self.daemon = True
 
-		self.hid = HIDTest(file)
+		self.hid = HIDTest(file, delta_timestamp)
 
 	def run(self):
 		HIDThread.sema.acquire()
@@ -332,12 +333,16 @@ class HIDThread(threading.Thread):
 # disable stdout buffering
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
-optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:')
+optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:')
+
+delta_timestamp = 0
 
 for opt, arg in optlist:
 	if opt == '-h':
 		print 'help me'
 		sys.exit(0)
+	elif opt == '-t':
+		delta_timestamp = float(arg)
 	elif opt == '-j':
 		HIDThread.count = int(arg)
 		if HIDThread.count < 1:
@@ -376,10 +381,10 @@ try:
 	threads = []
 	for file in list_of_hid_files:
 		if HIDThread.count > 1:
-			thread = HIDThread(file)
+			thread = HIDThread(file, delta_timestamp)
 			threads.append(thread)
 			thread.start()
-		elif HIDTest(file).run():
+		elif HIDTest(file, delta_timestamp).run():
 			break
 	while len(threads) > 0:
 		try:

@@ -136,7 +136,7 @@ def compare_desc(expected, result):
 
 	return True
 
-def compare_files(exp, res, str_result = None, prefix = ''):
+def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0):
 	''' returns ok, warning '''
 	last_expected = None
 	last_result = None
@@ -190,13 +190,13 @@ def compare_files(exp, res, str_result = None, prefix = ''):
 		last_expected = exp_time
 		last_result = res_time
 
-		if abs(exp_delta - res_delta) > 0.01:
+		if delta_timestamp > 0 and abs(exp_delta - res_delta) > delta_timestamp:
 			print_(str_result, prefix + 'line ' + str(res_line) + ', frame ' + str(i) + ': timestamps differs too much -> ' + str(res_delta - exp_delta) + ' at ' + str(res_time))
 			warning = True
 
 	return True, warning
 
-def compare_sets(expected_list, result_list, str_result = None):
+def compare_sets(expected_list, result_list, str_result = None, delta_timestamp = 0):
 	warning = False
 	matches = True
 	if expected_list == None:
@@ -233,7 +233,7 @@ def compare_sets(expected_list, result_list, str_result = None):
 				print_(str_result, prefix + 'no events received -> ignoring')
 		else:
 			found = True
-			r, w = compare_files(exp, res, str_result, prefix)
+			r, w = compare_files(exp, res, str_result, prefix, delta_timestamp)
 			warning = warning or w
 			matches = matches and r
 

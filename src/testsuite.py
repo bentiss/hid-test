@@ -339,7 +339,13 @@ delta_timestamp = 0
 
 for opt, arg in optlist:
 	if opt == '-h':
-		print 'help me'
+		print \
+""" -h	print the help message.
+ -jN	Launch N threads in parallel. This reduce the global time of the tests,
+	but corrupts the timestamps between frames.
+ -tS	Print a warning if the timestamps between two frames is greater than S.
+	Example: "-t0.01".
+	If S is 0, then timestamps are ignored (default behavior)."""
 		sys.exit(0)
 	elif opt == '-t':
 		delta_timestamp = float(arg)

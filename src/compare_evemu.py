@@ -245,6 +245,7 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 	return matches, warning
 
 def dump_diff(name, events_file):
+	import evdev
 	events_file.seek(0)
 	descr, frames = parse_evemu(events_file)
 	output = open(name, 'w')
@@ -255,10 +256,14 @@ def dump_diff(name, events_file):
 		f_number += 1
 		output.write('frame '+str(f_number) + ':\n')
 		for i in xrange(len(frame)):
+			type, code, value = frame[i].split(' ')
+			type = int(type, 16)
+			code = int(code, 16)
+			stype, scode = evdev.match(type, code)
 			end = '\n'
 			if i in extras:
 				end = '*\n'
-			output.write('    '+ frame[i] + end)
+			output.write('    '+ frame[i] + ' '*(30 - len(frame[i])) + '# ' + stype + ' / ' + scode + end)
 	output.close()
 
 if __name__ == '__main__':

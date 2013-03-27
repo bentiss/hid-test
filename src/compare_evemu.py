@@ -244,5 +244,36 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 
 	return matches, warning
 
+def dump_diff(name, events_file):
+	events_file.seek(0)
+	descr, frames = parse_evemu(events_file)
+	output = open(name, 'w')
+	f_number = 0
+	for d in descr:
+		output.write(d)
+	for time, n, frame, extras in frames:
+		f_number += 1
+		output.write('frame '+str(f_number) + ':\n')
+		for i in xrange(len(frame)):
+			end = '\n'
+			if i in extras:
+				end = '*\n'
+			output.write('    '+ frame[i] + end)
+	output.close()
+
 if __name__ == '__main__':
-	print compare_files(parse_evemu(open(sys.argv[1])), parse_evemu(open(sys.argv[2])))
+	f0 = open(sys.argv[1])
+	f1 = open(sys.argv[2])
+	success, warning = compare_files(parse_evemu(f0), parse_evemu(f1))
+	if not success:
+		print "test failed, dumping outputs in:"
+		name = os.path.basename(sys.argv[1]) + ".evd"
+		dump_diff(name, f0)
+		print name
+		name = os.path.basename(sys.argv[2]) + ".evd"
+		dump_diff(name, f1)
+		print name
+	else:
+		print "the too files are equivalent"
+	f0.close()
+	f1.close()

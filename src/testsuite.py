@@ -135,37 +135,20 @@ class HIDTest(object):
 				expected.write(l)
 		return outfiles
 
-	def dump_diff(self, name, events_file):
-		events_file.seek(0)
-		descr, frames = compare_evemu.parse_evemu(events_file)
-		output = open(name, 'w')
-		f_number = 0
-		for d in descr:
-			output.write(d)
-		for time, n, frame, extras in frames:
-			f_number += 1
-			output.write('frame '+str(f_number) + ':\n')
-			for i in xrange(len(frame)):
-				end = '\n'
-				if i in extras:
-					end = '*\n'
-				output.write('    '+ frame[i] + end)
-		output.close()
-
 	def dump_diffs(self):
 		hid_name = os.path.splitext(os.path.basename(self.path))[0]
 		outfiles = []
 		for i in xrange(len(self.outs)):
 			ev_name = hid_name + '_res_' + str(i) + ".evd"
 			outfiles.append(ev_name)
-			self.dump_diff(ev_name, self.outs[i])
+			compare_evemu.dump_diff(ev_name, self.outs[i])
 		if not self.expected:
 			return outfiles
 		for i in xrange(len(self.expected)):
 			ev_name = hid_name + '_exp_' + str(i) + ".evd"
 			outfiles.append(ev_name)
 			expect = open(self.expected[i], 'r')
-			self.dump_diff(ev_name, expect)
+			compare_evemu.dump_diff(ev_name, expect)
 			expect.close()
 		return outfiles
 

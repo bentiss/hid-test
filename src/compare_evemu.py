@@ -60,6 +60,8 @@ def parse_evemu(file):
 		return []
 
 	for line in file.readlines():
+		if line.startswith('#'):
+			continue
 		if line.startswith('E:'):
 			e, time, type, code, value = line.split(' ')
 			value = value.rstrip('\n')

@@ -29,6 +29,7 @@ import shlex
 import threading
 import compare_evemu
 import getopt
+import re
 
 context = pyudev.Context()
 
@@ -47,6 +48,7 @@ global_lock = threading.Lock()
 global_condition = threading.Condition()
 global_condition_op = False
 
+kernel_release_regexp = re.compile(r"(\d+)\.(\d+)[^\d]*")
 
 def log_event(action, device):
 	if 'event' in device.sys_name:
@@ -159,6 +161,14 @@ class HIDTest(object):
 		if self.hid_replay :
 			self.hid_replay.terminate()
 
+	def get_major_minor(self, string):
+		m = kernel_release_regexp.match(string)
+		if not m:
+			return 0
+		major_r, minor_r = m.groups()
+		major_r, minor_r = int(major_r), int(minor_r)
+		return major_r << 16 | minor_r
+
 	def run(self):
 		self.reset()
 		results = None
@@ -172,17 +182,15 @@ class HIDTest(object):
 
 		# In case there are several files, keep the right one
 		if results:
-			kernel_release = os.uname()[2]
-			major, minor = kernel_release.split('.')[:2]
+			kernel_release = self.get_major_minor(os.uname()[2])
 			_results = {}
 			for r in results:
 				basename = os.path.basename(r)
-				rkernel_release = os.path.basename(os.path.dirname(r)).rstrip('.x')
-				if fast_mode:
-					major_skip, minor_skip = rkernel_release.split('.')[:2]
-					if major == major_skip and minor == minor_skip:
+				rkernel_release = self.get_major_minor(os.path.basename(os.path.dirname(r)))
+				if rkernel_release and fast_mode:
+					if kernel_release == rkernel_release:
 						skip = True
-				if not rkernel_release.startswith('3.'):
+				if not rkernel_release:
 					rkernel_release = kernel_release
 				if kernel_release < rkernel_release:
 					# ignore dumps from earlier kernels
@@ -190,8 +198,8 @@ class HIDTest(object):
 				if basename not in _results.keys():
 					_results[basename] = r
 				else:
-					current_kernel_release = os.path.basename(os.path.dirname(_results[basename])).rstrip('.x')
-					if current_kernel_release < rkernel_release:
+					prev_kernel_release = self.get_major_minor(os.path.basename(os.path.basename(os.path.dirname(_results[basename]))))
+					if prev_kernel_release < rkernel_release:
 						# overwrite the file only if the kernel release is earlier
 						_results[basename] = r
 			results = _results.values()

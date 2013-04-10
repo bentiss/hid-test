@@ -162,6 +162,7 @@ class HIDTest(object):
 	def run(self):
 		self.reset()
 		results = None
+		skip = False
 		rname = os.path.splitext(os.path.basename(self.path))[0]
 		for ev_file in ev_files:
 			if rname in ev_file:
@@ -190,6 +191,21 @@ class HIDTest(object):
 						_results[basename] = r
 			results = _results.values()
 			results.sort()
+
+		# In case we did not matched any output, maybe we should skip the test
+		if not results or len(results) == 0:
+			kernel_release = os.uname()[2]
+			major, minor = kernel_release.split('.')[:2]
+			for skip_file in skip_files:
+				if rname in skip_file:
+					kernel_skip = os.path.basename(os.path.dirname(skip_file))
+					major_skip, minor_skip = kernel_skip.split('.')[:2]
+					if major == major_skip and minor == minor_skip:
+						skip = True
+
+		if skip:
+			print "ignoring test", self.path, "(marked skipped)"
+			return 1
 
 		self.expected = results
 
@@ -273,7 +289,7 @@ class HIDTest(object):
 		print '\n'.join(str_result)
 		global_lock.release()
 
-		return None
+		return 0
 
 def report_results(tests):
 	good = 0
@@ -305,7 +321,7 @@ class HIDThread(threading.Thread):
 
 	def run(self):
 		HIDThread.sema.acquire()
-		if HIDThread.ok and self.hid.run():
+		if HIDThread.ok and self.hid.run() < 0:
 			HIDThread.ok = False
 		HIDThread.sema.release()
 
@@ -347,11 +363,12 @@ if len(args) > 0:
 	rootdir = args[0]
 hid_files = []
 ev_files = []
+skip_files = []
 
 # starts xi2dettach
 xi2detach = subprocess.Popen(shlex.split(os.path.join(os.path.dirname(sys.argv[0]), 'xi2detach')), stderr= subprocess.PIPE, stdout= subprocess.PIPE)
 
-# first, retrieve all the .hid and .ev files in rootdir (first arg if given, otherwise, cwd)
+# first, retrieve all the .hid, .ev and .skip files in rootdir (first arg if given, otherwise, cwd)
 for root, dirs, files in os.walk(rootdir):
 	for f in files:
 		path = os.path.join(root, f)
@@ -359,6 +376,8 @@ for root, dirs, files in os.walk(rootdir):
 			hid_files.append(path)
 		elif f.endswith(".ev"):
 			ev_files.append(path)
+		elif f.endswith(".skip"):
+			skip_files.append(path)
 
 try:
 	# if specific devices are given, treat them, otherwise, run the test on all .hid
@@ -373,7 +392,7 @@ try:
 			thread = HIDThread(file, delta_timestamp)
 			threads.append(thread)
 			thread.start()
-		elif HIDTest(file, delta_timestamp).run():
+		elif HIDTest(file, delta_timestamp).run() < 0:
 			break
 	while len(threads) > 0:
 		try:

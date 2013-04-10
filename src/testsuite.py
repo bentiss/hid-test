@@ -173,10 +173,15 @@ class HIDTest(object):
 		# In case there are several files, keep the right one
 		if results:
 			kernel_release = os.uname()[2]
+			major, minor = kernel_release.split('.')[:2]
 			_results = {}
 			for r in results:
 				basename = os.path.basename(r)
 				rkernel_release = os.path.basename(os.path.dirname(r)).rstrip('.x')
+				if fast_mode:
+					major_skip, minor_skip = rkernel_release.split('.')[:2]
+					if major == major_skip and minor == minor_skip:
+						skip = True
 				if not rkernel_release.startswith('3.'):
 					rkernel_release = kernel_release
 				if kernel_release < rkernel_release:
@@ -332,9 +337,11 @@ class HIDThread(threading.Thread):
 # disable stdout buffering
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
-optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:')
+optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:f')
 
 delta_timestamp = 0
+
+fast_mode = False
 
 for opt, arg in optlist:
 	if opt == '-h':
@@ -344,7 +351,9 @@ for opt, arg in optlist:
 	but corrupts the timestamps between frames.
  -tS	Print a warning if the timestamps between two frames is greater than S.
 	Example: "-t0.01".
-	If S is 0, then timestamps are ignored (default behavior)."""
+	If S is 0, then timestamps are ignored (default behavior).
+ -f	"fast mode": if a device already has an expected output from the same
+	kernel series, then skip the test."""
 		sys.exit(0)
 	elif opt == '-t':
 		delta_timestamp = float(arg)
@@ -353,6 +362,8 @@ for opt, arg in optlist:
 		if HIDThread.count < 1:
 			print "the number of threads can not be less than one. Disabling threading launches."
 			HIDThread.count = 1
+	elif opt == '-f':
+		fast_mode = True
 
 if not os.path.exists("/dev/uhid"):
 	print "It is required to load the uhid kernel module."

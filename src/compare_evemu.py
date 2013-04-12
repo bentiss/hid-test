@@ -63,10 +63,15 @@ def parse_evemu(file):
 		if line.startswith('#'):
 			continue
 		if line.startswith('E:'):
-			e, time, type, code, value = line.split(' ')
-			value = value.rstrip('\n')
+			# remove end of lines comments
+			stripped_line = line[:line.find('#')].rstrip('\t ')
+			e, time, type, code, value = stripped_line.split(' ')
+
+			# newer evemu send the value with leading 0.
+			# transforming back and forth to str allows a common format
+			v = int(value)
+			value = str(v)
 			if int(type, 16) == 0 and int(code, 16) == 0:
-				v = int(value, 16)
 				if v == 0 :
 					# EV_SYN
 					if len(slots_values_updated) > 0:

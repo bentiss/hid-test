@@ -63,6 +63,17 @@ def log_event(action, device):
 			dev_path = "/dev/input/" + device.sys_name
 			subprocess.call(shlex.split("evemu-describe " + dev_path), stdout=tmp)
 
+			prev_pos = tmp.tell()
+			tmp.seek(0)
+			first_line = tmp.readline()
+			if first_line.startswith("# EVEMU"):
+				# FIXME: check evemu > 1.1, but as there is no release with 1.0...
+				# earlier evemu drop the description in evemu-record too
+				tmp.close()
+				tmp = os.tmpfile()
+			else:
+				tmp.seek(prev_pos)
+
 			# start capturing events
 			p = subprocess.Popen(shlex.split("evemu-record " + dev_path), stderr=subprocess.PIPE, stdout=tmp)
 

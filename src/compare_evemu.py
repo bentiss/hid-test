@@ -50,11 +50,13 @@ def parse_evemu(file):
 				extras.append(len(frame))
 				frame.append(v)
 
-	def terminate_frame(n):
+	def terminate_frame(n, trigger):
 		for k, v in values.items():
 			if k not in values_updated:
 				extras.append(len(frame))
 				frame.append(v)
+		if trigger:
+			frame.append(trigger)
 		if len(frame) > 0:
 			frames.append((float(time), n, frame, extras))
 		return []
@@ -76,10 +78,12 @@ def parse_evemu(file):
 					# EV_SYN
 					if len(slots_values_updated) > 0:
 						terminate_slot(slot)
-					frame = terminate_frame(n)
+					frame = terminate_frame(n, ' '.join([type, code, value]))
 				elif v == 1:
 					# Key repeat event, drop previous received keys
 					frame = [ f for f in frame if not f.startswith('0001 ')]
+				else:
+					frame.append(' '.join([type, code, value]))
 				slots_values_updated = []
 				values_updated = []
 				extras = []
@@ -115,7 +119,7 @@ def parse_evemu(file):
 		n += 1
 	if len(slots_values_updated) > 0:
 		terminate_slot(slot)
-	terminate_frame(n)
+	terminate_frame(n, None)
 
 	if len(frames) == 1:
 		time, n, frame, extras = frames[0]

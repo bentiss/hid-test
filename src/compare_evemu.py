@@ -57,6 +57,10 @@ def parse_evemu(file):
 				frame.append(v)
 		if trigger:
 			frame.append(trigger)
+		# EV_SYN(1) are a pain: adding them, no matter the device says
+		if "0000 0000 1" not in frame:
+			extras.append(len(frame))
+			frame.append("0000 0000 1")
 		if len(frame) > 0:
 			frames.append((float(time), n, frame, extras))
 		return []
@@ -80,8 +84,8 @@ def parse_evemu(file):
 						terminate_slot(slot)
 					frame = terminate_frame(n, ' '.join([type, code, value]))
 				elif v == 1:
-					# Key repeat event, drop previous received keys
-					frame = [ f for f in frame if not f.startswith('0001 ')]
+					if "0000 0000 1" not in frame:
+						frame.append(' '.join([type, code, value]))
 				else:
 					frame.append(' '.join([type, code, value]))
 				slots_values_updated = []
@@ -89,7 +93,12 @@ def parse_evemu(file):
 				extras = []
 			else:
 				c = int(code, 16)
-				if int(type, 16) == 3:
+				if int(type, 16) == 1:
+					# BTN event
+					if v == 2:
+						# key repeat event, drop it
+						continue
+				elif int(type, 16) == 3:
 					# absolute event
 					if c >=  0x2f and c <= 0x3d:
 						# MT event

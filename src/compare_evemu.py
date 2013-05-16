@@ -39,6 +39,7 @@ def parse_evemu(file):
 	extras = []
 	values = {}
 	values_updated = []
+	time = "0"
 
 	def terminate_slot(slot):
 		if slots_values[slot].has_key('0039') and slots_values[slot]['0039'].endswith('-1'):

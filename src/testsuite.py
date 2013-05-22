@@ -398,6 +398,9 @@ skip_files = []
 # starts xi2dettach
 xi2detach = subprocess.Popen(shlex.split(os.path.join(os.path.dirname(sys.argv[0]), 'xi2detach')), stderr= subprocess.PIPE, stdout= subprocess.PIPE)
 
+import time
+time.sleep(1)
+
 # first, retrieve all the .hid, .ev and .skip files in rootdir (first arg if given, otherwise, cwd)
 for root, dirs, files in os.walk(rootdir):
 	for f in files:

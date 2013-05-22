@@ -56,13 +56,13 @@ def parse_evemu(file):
 			if k not in values_updated:
 				extras.append(len(frame))
 				frame.append(v)
-		if trigger:
-			frame.append(trigger)
-		# EV_SYN(1) are a pain: adding them, no matter the device says
-		if "0000 0000 1" not in frame:
-			extras.append(len(frame))
-			frame.append("0000 0000 1")
 		if len(frame) > 0:
+			if trigger:
+				frame.append(trigger)
+			# EV_SYN(1) are a pain: adding them, no matter the device says
+			if "0000 0000 1" not in frame:
+				extras.append(len(frame))
+				frame.append("0000 0000 1")
 			frames.append((float(time), n, frame, extras))
 		return []
 

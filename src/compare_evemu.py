@@ -146,7 +146,27 @@ def print_(str_result, line):
 	else:
 		print line
 
+def cleanup_properties(expected, result):
+	if abs(len(expected) - len(result)) == 1:
+		exp_prop = False
+		res_prop = False
+		for d in expected:
+			if d.startswith("P:"):
+				exp_prop = True
+				break
+		for d in result:
+			if d.startswith("P:"):
+				res_prop = True
+				break
+		if exp_prop != res_prop:
+			if exp_prop:
+				expected = [d for d in expected if not d.startswith("P:")]
+			if res_prop:
+				result = [d for d in result if not d.startswith("P:")]
+	return expected, result
+
 def compare_desc(expected, result):
+	expected, result = cleanup_properties(expected, result)
 	if len(expected) != len(result):
 		return False
 
@@ -163,14 +183,16 @@ def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0)
 	last_result = None
 	warning = False
 
-	if len(exp[0]) != len(res[0]):
-		print_(str_result, prefix + 'description differs, got ' + str(len(res[0])) + ' lines, instead of ' + str(len(exp[0])))
+	exp_desc, res_desc = cleanup_properties(exp[0], res[0])
+
+	if len(exp_desc) != len(res_desc):
+		print_(str_result, prefix + 'description differs, got ' + str(len(res_desc)) + ' lines, instead of ' + str(len(exp_desc)))
 		return False, warning
 
-	for i in xrange(len(exp[0])):
-		if exp[0][i] != res[0][i]:
-			print_(str_result, prefix + 'line ' + str(i + 1) + ': error, got ' + str(res[0][i]) + ' instead of ' + str(exp[0][i]))
-			if res[0][i].startswith('A: 2f 0'):
+	for i in xrange(len(exp_desc)):
+		if exp_desc[i] != res_desc[i]:
+			print_(str_result, prefix + 'line ' + str(i + 1) + ': error, got ' + str(res_desc[i]) + ' instead of ' + str(exp_desc[i]))
+			if res_desc[i].startswith('A: 2f 0'):
 				print_(str_result, prefix + 'This error is related to slot definition, it may be harmless, continuing...')
 				warning = True
 			else:

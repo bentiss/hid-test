@@ -52,6 +52,10 @@ def parse_evemu(file):
 				frame.append(v)
 
 	def terminate_frame(n, trigger):
+		if len(frame) == 0 and trigger == "0000 0000 0":
+			# old kernels can not set HID_QUIRK_NO_INPUT_SYNC, giving from times
+			# to times empty frames
+			return []
 		for k, v in values.items():
 			if k not in values_updated:
 				extras.append(len(frame))

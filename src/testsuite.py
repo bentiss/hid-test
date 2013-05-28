@@ -61,7 +61,9 @@ def log_event(action, device):
 
 			# get node attributes
 			dev_path = "/dev/input/" + device.sys_name.encode('ascii')
-			subprocess.call(shlex.split("evemu-describe " + dev_path), stdout=tmp)
+			if subprocess.call(shlex.split("evemu-describe " + dev_path), stdout=tmp):
+				# the device has already been unplugged
+				return
 
 			prev_pos = tmp.tell()
 			tmp.seek(0)
@@ -90,7 +92,11 @@ def log_event(action, device):
 
 		elif action == 'remove':
 			# get corresponding capturing process in background
-			result, p, hid = nodes[device.sys_name]
+			try:
+				result, p, hid = nodes[device.sys_name]
+			except KeyError:
+				# not a registered device => we don't care
+				return
 
 			# wait for it to terminate
 			p.wait()

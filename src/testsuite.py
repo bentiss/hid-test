@@ -33,7 +33,7 @@ import re
 
 context = pyudev.Context()
 
-hid_replay_path = "/home/btissoir/Src/Kernel/hid-replay/src"
+hid_replay_path = "/usr/bin"
 hid_replay_cmd = "hid-replay"
 hid_replay = hid_replay_path + '/' + hid_replay_cmd
 

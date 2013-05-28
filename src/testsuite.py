@@ -60,7 +60,7 @@ def log_event(action, device):
 			tmp = os.tmpfile()
 
 			# get node attributes
-			dev_path = "/dev/input/" + device.sys_name
+			dev_path = "/dev/input/" + device.sys_name.encode('ascii')
 			subprocess.call(shlex.split("evemu-describe " + dev_path), stdout=tmp)
 
 			prev_pos = tmp.tell()

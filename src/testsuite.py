@@ -198,8 +198,8 @@ class HIDTest(object):
 				results.append(ev_file)
 
 		# In case there are several files, keep the right one
+		kernel_release = self.get_major_minor(os.uname()[2])
 		if results:
-			kernel_release = self.get_major_minor(os.uname()[2])
 			_results = {}
 			for r in results:
 				basename = os.path.basename(r)
@@ -224,13 +224,11 @@ class HIDTest(object):
 
 		# In case we did not matched any output, maybe we should skip the test
 		if not results or len(results) == 0:
-			kernel_release = os.uname()[2]
-			major, minor = kernel_release.split('.')[:2]
 			for skip_file in skip_files:
 				if rname in skip_file:
 					kernel_skip = os.path.basename(os.path.dirname(skip_file))
-					major_skip, minor_skip = kernel_skip.split('.')[:2]
-					if major == major_skip and minor == minor_skip:
+					rkernel_release = self.get_major_minor(kernel_skip)
+					if rkernel_release == kernel_release:
 						skip = True
 
 		if skip:

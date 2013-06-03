@@ -50,6 +50,11 @@ global_condition_op = False
 
 kernel_release_regexp = re.compile(r"(\d+)\.(\d+)[^\d]*")
 
+raw_length = 78
+
+global total_tests_count
+total_tests_count = 0
+
 def log_event(action, device):
 	if 'event' in device.sys_name:
 #		print action, device, device.sys_name
@@ -186,6 +191,17 @@ class HIDTest(object):
 		major_r, minor_r = int(major_r), int(minor_r)
 		return major_r << 16 | minor_r
 
+	def append_result(self, str_result, result, warning, skipped):
+		global_lock.acquire()
+		# append the result of the test to the list,
+		tests.append((self.path, (result, warning, skipped)))
+
+		str_result.append(get_results_count(tests))
+		str_result.append("-" * raw_length)
+
+		print '\n'.join(str_result)
+		global_lock.release()
+
 	def run(self):
 		self.reset()
 		results = None
@@ -199,6 +215,7 @@ class HIDTest(object):
 
 		# In case there are several files, keep the right one
 		kernel_release = self.get_major_minor(os.uname()[2])
+		kernel_release = self.get_major_minor('3.10')
 		if results:
 			_results = {}
 			for r in results:
@@ -233,6 +250,7 @@ class HIDTest(object):
 
 		if skip:
 			print "ignoring test", self.path, "(marked skipped)"
+			self.append_result([], False, False, True)
 			return 1
 
 		self.expected = results
@@ -280,7 +298,6 @@ class HIDTest(object):
 		for sys_name, name, out in self.nodes_ready:
 			self.outs.append(out)
 
-		raw_length = 78
 		basename = os.path.basename(self.path)
 		name_length = len(basename) + 2
 		prev = (raw_length - name_length) / 2
@@ -307,30 +324,56 @@ class HIDTest(object):
 		for out in self.outs:
 			out.close()
 
-		global_lock.acquire()
 		# append the result of the test to the list,
 		# we only count the warning if the test passed
-		tests.append((self.path, (r, w and r)))
-
-		str_result.append("-" * raw_length)
-
-		print '\n'.join(str_result)
-		global_lock.release()
+		self.append_result(str_result, r, w and r, False)
 
 		return 0
 
-def report_results(tests):
+def get_results_count(tests):
 	good = 0
+	err = 0
 	warn = 0
-	for file, (r, w) in tests:
+	skipped = 0
+	for file, (r, w, s) in tests:
+		if s:
+			skipped += 1
+			continue
+		if r: good += 1
+		else: err += 1
+		if w: warn += 1
+	run_count = good + err + skipped
+	str_result = "%d / %d tests run, %d / %d passed"%(run_count, total_tests_count, good, good + err)
+	if err or warn or skipped:
+		n = 0
+		for c in (err, warn, skipped):
+			if c: n += 1
+		splits = ('', ' and ', ', ')
+		s = ""
+		if warn:
+			s += "%d warnings"%(warn)
+			n -= 1
+			if n:
+				s += splits[n]
+		if err:
+			s += "%d errors"%(err)
+			n -= 1
+			if n:
+				s += splits[n]
+		if skipped:
+			s += "%d skipped"%(skipped)
+		str_result += " (%s)"%(s)
+	return str_result
+
+def report_results(tests):
+	for file, (r, w, s) in tests:
 		print file, "->", r,
 		if w:
 			print '(warning raised)'
 		else:
 			print ''
-		if r: good += 1
-		if w: warn += 1
-	print good,'/', len(tests), 'tests passed (', warn, 'warnings )'
+	print get_results_count(tests)
+
 class HIDThread(threading.Thread):
 	count = 1
 	sema = None
@@ -424,6 +467,7 @@ try:
 		list_of_hid_files = args[1:]
 
 	threads = []
+	total_tests_count = len(list_of_hid_files)
 	for file in list_of_hid_files:
 		if HIDThread.count > 1:
 			thread = HIDThread(file, delta_timestamp)

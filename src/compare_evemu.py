@@ -314,6 +314,14 @@ def dump_diff(name, events_file):
 	output.close()
 
 if __name__ == '__main__':
+	if len(sys.argv) == 2:
+		f0 = open(sys.argv[1])
+		parsed = parse_evemu(f0)
+		name = os.path.basename(sys.argv[1]) + ".evd"
+		print "dumping output in:", name
+		dump_diff(name, f0)
+		f0.close()
+		sys.exit(0)
 	f0 = open(sys.argv[1])
 	f1 = open(sys.argv[2])
 	success, warning = compare_files(parse_evemu(f0), parse_evemu(f1))

@@ -367,6 +367,8 @@ def get_results_count(tests):
 
 def report_results(tests):
 	for file, (r, w, s) in tests:
+		if s:
+			continue
 		print file, "->", r,
 		if w:
 			print '(warning raised)'

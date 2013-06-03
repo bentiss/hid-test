@@ -22,52 +22,155 @@
 
 import os
 import sys
+import evdev
 
 # Sometimes, the events within a frame (between two EV_SYN events) may not be
 # ordered in the same way.
 # This comparison is not sensitive to this problem.
 
+class Event(object):
+	def __init__(self, time, _type, code, value):
+		self.time = time
+		self.type = _type
+		if type(_type) == str:
+			self.type = int(_type, 16)
+		self.code = code
+		if type(code) == str:
+			self.code = int(code, 16)
+		self.value = value
+		if type(value) == str:
+			self.value = int(value)
+		self.extra = False
+
+	def copy(self):
+		s = Event(self.time, self.type, self.code, self.value)
+		s.extra = self.extra
+		return s
+
+	def is_mt_event(self):
+		return self.type == 3 and self.code >= 0x2f and self.code <= 0x3d
+
+	def is_slot(self):
+		return self.type == 3 and self.code == 0x2f
+
+	def __eq__(self, other):
+		return  other and \
+				self.type  == other.type and \
+				self.code  == other.code and \
+				self.value == other.value
+
+	def __repr__(self):
+		return "%04d %04x %d"%(self.type, self.code, self.value)
+
+	def str_repr(self):
+		return evdev.match(self.type, self.code)
+
+class InputObj(object):
+	def __init__(self):
+		self.slots = {0: Slot(0)}
+		self.absevents = {}
+		self.current_slot = self.slots[0]
+
+	def __add_event(self, event):
+		ev = event.copy()
+		ev.updated = True
+		self.absevents[ev.code] = ev
+
+	def add_event(self, event):
+		if event.is_slot():
+			slot = event.value
+			if not self.slots.has_key(slot):
+				self.slots[slot] = Slot(slot)
+			self.current_slot = self.slots[slot]
+			self.current_slot.add_event(event)
+			self.__add_event(event)
+		elif event.is_mt_event():
+			self.current_slot.add_event(event)
+		else:
+			self.__add_event(event)
+
+	def get_non_updated_events(self):
+		items = []
+		keys = self.absevents.keys()
+		keys.sort()
+		for key in keys:
+			event = self.absevents[key]
+			if event.updated:
+				event.updated = False
+			else:
+				ev = event.copy()
+				ev.extra = True
+				items.append(ev)
+		return items
+
+class Slot(object):
+	def __init__(self, slot_number):
+		self.slot_number = slot_number
+		self.events = {}
+		# add the tracking ID event to the uninitialized state
+		self.add_event(Event(0, 3, 0x39, -1))
+
+	def add_event(self, event):
+		ev = event.copy()
+		ev.updated = True
+		self.events[ev.code] = ev
+
+	def contains(self, code):
+		return self.events.has_key(code) and self.events[code].updated
+
+	def get_non_updated_events(self):
+		items = []
+		has_been_updated = False
+		keys = self.events.keys()
+		keys.sort()
+		for key in keys:
+			event = self.events[key]
+			if event.updated:
+				event.updated = False
+				has_been_updated = True
+			else:
+				ev = event.copy()
+				ev.extra = True
+				items.append(ev)
+		if not has_been_updated:
+			items = []
+		if self.events[0x39].value == -1:
+			# inactive slot
+			items = []
+		return items
+
 def parse_evemu(file):
 	descr = []
 	frames = []
 	frame = []
-	slot = 0
-	last_slot = 0
+	input = InputObj()
+	slot = input.current_slot
 	n = 1
-	slots_values = {0:{}}
-	slots_values_updated = []
-	extras = []
-	values = {}
-	values_updated = []
 	time = "0"
 
+	syn_event = Event("0", "0000", "0000", "0")
+	syn_event.extra = True
+
+	syn_k_event = Event("0", "0000", "0000", "1")
+	syn_k_event.extra = True
+
 	def terminate_slot(slot):
-		if slots_values[slot].has_key('0039') and slots_values[slot]['0039'].endswith('-1'):
-			return
-		if len(slots_values_updated) == 0:
-			return
-		for k, v in slots_values[slot].items():
-			if k not in slots_values_updated:
-				extras.append(len(frame))
-				frame.append(v)
+		frame.extend(slot.get_non_updated_events())
 
 	def terminate_frame(n, trigger):
-		if len(frame) == 0 and trigger == "0000 0000 0":
+		if len(frame) == 0 and trigger == syn_event:
 			# old kernels can not set HID_QUIRK_NO_INPUT_SYNC, giving from times
 			# to times empty frames
 			return []
-		for k, v in values.items():
-			if k not in values_updated:
-				extras.append(len(frame))
-				frame.append(v)
+		extras = input.get_non_updated_events()
+		frame.extend(extras)
 		if len(frame) > 0:
 			if trigger:
 				frame.append(trigger)
 			# EV_SYN(1) are a pain: adding them, no matter the device says
-			if "0000 0000 1" not in frame:
-				extras.append(len(frame))
-				frame.append("0000 0000 1")
-			frames.append((float(time), n, frame, extras))
+			if syn_k_event not in frame:
+				frame.append(syn_k_event)
+			frames.append((float(time), n, frame))
 		return []
 
 	for line in file.readlines():
@@ -77,67 +180,57 @@ def parse_evemu(file):
 			# remove end of lines comments
 			stripped_line = line[:line.find('#')].rstrip('\t ')
 			e, time, type, code, value = stripped_line.split(' ')
+			event = Event(time, type, code, value)
 
-			# newer evemu send the value with leading 0.
-			# transforming back and forth to str allows a common format
-			v = int(value)
-			value = str(v)
-			if int(type, 16) == 0 and int(code, 16) == 0:
-				if v == 0 :
+			if event.type == 0 and event.code == 0:
+				if event == syn_event:
 					# EV_SYN
-					if len(slots_values_updated) > 0:
+					if slot:
 						terminate_slot(slot)
-					frame = terminate_frame(n, ' '.join([type, code, value]))
-				elif v == 1:
-					if "0000 0000 1" not in frame:
-						frame.append(' '.join([type, code, value]))
+					frame = terminate_frame(n, event)
+				elif event == syn_k_event:
+					if syn_k_event not in frame:
+						frame.append(event)
 				else:
-					frame.append(' '.join([type, code, value]))
-				slots_values_updated = []
-				values_updated = []
-				extras = []
+					frame.append(event)
 			else:
-				c = int(code, 16)
-				if int(type, 16) == 1:
+				c = event.code
+				if event.type == 1:
 					# BTN event
-					if v == 2:
+					if event.value == 2:
 						# key repeat event, drop it
 						continue
-				elif int(type, 16) == 3:
+				elif event.type == 3:
 					# absolute event
-					if c >=  0x2f and c <= 0x3d:
+					if event.is_mt_event():
 						# MT event
-						if c == 0x2f:
-							if len(slots_values_updated) > 0:
+						if event.is_slot():
+							if slot:
 								terminate_slot(slot)
-							# slot value
-							slot = value
-							if slot not in slots_values.keys():
-								slots_values[slot] = {}
-							slots_values_updated = []
-						elif len(slots_values_updated) == 0:
+						elif not slot.contains(0x2f):
 							# if the slot was not given, then add it to avoid
 							# missmatches if slots are not given in the very same order
-							str_slot = '0003 002f ' + str(slot)
-							extras.append(len(frame))
-							frame.append(str_slot)
-							slots_values_updated.append('002f')
-						slots_values_updated.append(code)
-						slots_values[slot][code] = ' '.join([type, code, value])
+							slotEv = Event('0', '0003', '002f', str(slot.slot_number))
+							slotEv.extra = True
+							input.add_event(slotEv)
+							frame.append(slotEv)
+						input.add_event(event)
+						if event.is_slot:
+							slot = input.current_slot
 					else:
-						values_updated.append(code)
-						values[code] = ' '.join([type, code, value])
-				frame.append(' '.join([type, code, value]))
+						input.add_event(event)
+				frame.append(event)
 		else:
 			descr.append(line)
 		n += 1
-	if len(slots_values_updated) > 0:
+
+	if slot:
 		terminate_slot(slot)
 	terminate_frame(n, None)
 
 	if len(frames) == 1:
-		time, n, frame, extras = frames[0]
-		if len(frame) == 1 and frame[0] == '0000 0000 1':
+		time, n, frame = frames[0]
+		if len(frame) == 1 and frame[0] == syn_k_event:
 			# all keys up event sent on disconnect
 			# that means that no events were sent, we can drop the
 			# results
@@ -210,15 +303,15 @@ def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0)
 		return False, warning
 
 	for i in xrange(len(exp[1])):
-		exp_time, exp_line, exp_events, extras = exp[1][i]
-		res_time, res_line, res_events, extras = res[1][i]
+		exp_time, exp_line, exp_events = exp[1][i]
+		res_time, res_line, res_events = res[1][i]
 		if len(exp_events) != len(res_events):
 			print_(str_result, prefix + 'line ' + str(res_line) + ', frame ' + str(i + 1) + ': got ' + str(len(res_events)) + ' events instead of ' + str(len(exp_events)))
 			return False, warning
 
 		for j in xrange(len(exp_events)):
 			r = res_events[j]
-			if r.startswith('0003 002f '):
+			if r.is_slot():
 				# ignore slots, as they may be changed at each run
 				continue
 			if r not in exp_events:
@@ -292,25 +385,22 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 	return matches, warning
 
 def dump_diff(name, events_file):
-	import evdev
 	events_file.seek(0)
 	descr, frames = parse_evemu(events_file)
 	output = open(name, 'w')
 	f_number = 0
 	for d in descr:
 		output.write(d)
-	for time, n, frame, extras in frames:
+	for time, n, frame in frames:
 		f_number += 1
 		output.write('frame '+str(f_number) + ':\n')
 		for i in xrange(len(frame)):
-			type, code, value = frame[i].split(' ')
-			type = int(type, 16)
-			code = int(code, 16)
-			stype, scode = evdev.match(type, code)
+			event = frame[i]
+			stype, scode = event.str_repr()
 			end = '\n'
-			if i in extras:
+			if event.extra:
 				end = '*\n'
-			output.write('    '+ frame[i] + ' '*(30 - len(frame[i])) + '# ' + stype + ' / ' + scode + end)
+			output.write('    '+ str(frame[i]) + ' '*(30 - len(str(frame[i]))) + '# ' + stype + ' / ' + scode + end)
 	output.close()
 
 if __name__ == '__main__':

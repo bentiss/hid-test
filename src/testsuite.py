@@ -215,7 +215,6 @@ class HIDTest(object):
 
 		# In case there are several files, keep the right one
 		kernel_release = self.get_major_minor(os.uname()[2])
-		kernel_release = self.get_major_minor('3.10')
 		if results:
 			_results = {}
 			for r in results:

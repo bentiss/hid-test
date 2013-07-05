@@ -269,8 +269,12 @@ def compare_desc(expected, result):
 
 	for i in xrange(len(expected)):
 		if expected[i] != result[i]:
-			if not expected[i].startswith('A: 2f 0'):
-				return False
+			if expected[i].startswith('N: '):
+				# ignore naming differences
+				continue
+			if expected[i].startswith('A: 2f 0'):
+				continue
+			return False
 
 	return True
 
@@ -288,6 +292,9 @@ def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0)
 
 	for i in xrange(len(exp_desc)):
 		if exp_desc[i] != res_desc[i]:
+			if res_desc[i].startswith('N: '):
+				print_(str_result, prefix + ': name changed from "' + str(exp_desc[i])[3:].strip() + '" to "' + str(res_desc[i])[3:].strip() + '"')
+				continue
 			print_(str_result, prefix + 'line ' + str(i + 1) + ': error, got ' + str(res_desc[i]) + ' instead of ' + str(exp_desc[i]))
 			if res_desc[i].startswith('A: 2f 0'):
 				print_(str_result, prefix + 'This error is related to slot definition, it may be harmless, continuing...')

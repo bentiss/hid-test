@@ -400,73 +400,49 @@ class HIDThread(threading.Thread):
 	def terminate(self):
 		self.hid.terminate()
 
-
-# disable stdout buffering
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
-
-optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:f')
+def help(argv):
+	print argv[0], "[OPTION] [DATABASE [HID_DEVICES]]\n"\
+"""Where:
+ * DATABASE is a path containing .hid files and their corresponding .ev (evemu traces).
+	If omitted, using '.' as a database.
+ * HID_DEVICES is one or more .hid files.
+ * OPTION is:
+	-h	print the help message.
+	-jN	Launch N threads in parallel. This reduce the global time of the tests,
+		but corrupts the timestamps between frames.
+	-tS	Print a warning if the timestamps between two frames is greater than S.
+		Example: "-t0.01".
+		If S is 0, then timestamps are ignored (default behavior).
+	-f	"fast mode": if a device already has an expected output from the same
+		kernel series, then skip the test."""
 
 delta_timestamp = 0
-
 fast_mode = False
-
-for opt, arg in optlist:
-	if opt == '-h':
-		print \
-""" -h	print the help message.
- -jN	Launch N threads in parallel. This reduce the global time of the tests,
-	but corrupts the timestamps between frames.
- -tS	Print a warning if the timestamps between two frames is greater than S.
-	Example: "-t0.01".
-	If S is 0, then timestamps are ignored (default behavior).
- -f	"fast mode": if a device already has an expected output from the same
-	kernel series, then skip the test."""
-		sys.exit(0)
-	elif opt == '-t':
-		delta_timestamp = float(arg)
-	elif opt == '-j':
-		HIDThread.count = int(arg)
-		if HIDThread.count < 1:
-			print "the number of threads can not be less than one. Disabling threading launches."
-			HIDThread.count = 1
-	elif opt == '-f':
-		fast_mode = True
-
-if not os.path.exists("/dev/uhid"):
-	print "It is required to load the uhid kernel module."
-	sys.exit(1)
-
-rootdir = '.'
-if len(args) > 0:
-	rootdir = args[0]
 hid_files = []
 ev_files = []
 skip_files = []
 
-# starts xi2dettach
-xi2detach = subprocess.Popen(shlex.split(os.path.join(os.path.dirname(sys.argv[0]), 'xi2detach')), stderr= subprocess.PIPE, stdout= subprocess.PIPE)
+def start_xi2detach():
+	# starts xi2detach
+	xi2detach = subprocess.Popen(shlex.split(os.path.join(os.path.dirname(sys.argv[0]), 'xi2detach')), stderr= subprocess.PIPE, stdout= subprocess.PIPE)
 
-import time
-time.sleep(1)
+	import time
+	time.sleep(1)
+	return xi2detach
 
-# first, retrieve all the .hid, .ev and .skip files in rootdir (first arg if given, otherwise, cwd)
-for root, dirs, files in os.walk(rootdir):
-	for f in files:
-		path = os.path.join(root, f)
-		if f.endswith(".hid"):
-			hid_files.append(path)
-		elif f.endswith(".ev"):
-			ev_files.append(path)
-		elif f.endswith(".skip"):
-			skip_files.append(path)
+def construct_db(rootdir):
+	# first, retrieve all the .hid, .ev and .skip files in rootdir (first arg if given, otherwise, cwd)
+	for root, dirs, files in os.walk(rootdir):
+		for f in files:
+			path = os.path.join(root, f)
+			if f.endswith(".hid"):
+				hid_files.append(path)
+			elif f.endswith(".ev"):
+				ev_files.append(path)
+			elif f.endswith(".skip"):
+				skip_files.append(path)
 
-try:
-	# if specific devices are given, treat them, otherwise, run the test on all .hid
-	hid_files.sort()
-	list_of_hid_files = hid_files
-	if len(args) > 1:
-		list_of_hid_files = args[1:]
-
+def run_tests(list_of_hid_files):
 	threads = []
 	total_tests_count = len(list_of_hid_files)
 	for file in list_of_hid_files:
@@ -489,7 +465,49 @@ try:
 			HIDThread.ok = False
 			for t in threads:
 				t.terminate()
-finally:
-	report_results(tests)
-	xi2detach.terminate()
 
+def main():
+	# disable stdout buffering
+	sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+
+	optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:f')
+	for opt, arg in optlist:
+		if opt == '-h':
+			help(sys.argv)
+			sys.exit(0)
+		elif opt == '-t':
+			delta_timestamp = float(arg)
+		elif opt == '-j':
+			HIDThread.count = int(arg)
+			if HIDThread.count < 1:
+				print "the number of threads can not be less than one. Disabling threading launches."
+				HIDThread.count = 1
+		elif opt == '-f':
+			fast_mode = True
+
+	if not os.path.exists("/dev/uhid"):
+		print "It is required to load the uhid kernel module."
+		sys.exit(1)
+
+	rootdir = '.'
+	if len(args) > 0:
+		rootdir = args[0]
+
+	construct_db(rootdir)
+
+	xi2detach = start_xi2detach()
+
+	# if specific devices are given, treat them, otherwise, run the test on all .hid
+	hid_files.sort()
+	list_of_hid_files = hid_files
+	if len(args) > 1:
+		list_of_hid_files = args[1:]
+
+	try:
+		run_tests(list_of_hid_files)
+	finally:
+		report_results(tests)
+		xi2detach.terminate()
+
+if __name__ == "__main__":
+	main()

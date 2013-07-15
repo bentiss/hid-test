@@ -48,12 +48,13 @@ global_lock = threading.Lock()
 global_condition = threading.Condition()
 global_condition_op = False
 
-kernel_release_regexp = re.compile(r"(\d+)\.(\d+)[^\d]*")
-
 raw_length = 78
 
 global total_tests_count
 total_tests_count = 0
+
+global skipped
+skipped = []
 
 def log_event(action, device):
 	if 'event' in device.sys_name:
@@ -131,20 +132,30 @@ observer.start()
 
 tests = []
 
+def get_major_minor(string = os.uname()[2]):
+	kernel_release_regexp = re.compile(r"(\d+)\.(\d+)[^\d]*")
+	m = kernel_release_regexp.match(string)
+	if not m:
+		return 0
+	major_r, minor_r = m.groups()
+	major_r, minor_r = int(major_r), int(minor_r)
+	return major_r << 16 | minor_r
+
+
 class HIDTest(object):
 	running = True
-	def __init__(self, path, delta_timestamp):
+	def __init__(self, path, delta_timestamp, expected):
 		self.path = path
 		self.reset()
 		self.hid_replay = None
 		self.delta_timestamp = delta_timestamp
+		self.expected = expected
 
 	def reset(self):
 		self.nodes = {}
 		self.nodes_ready = []
 		self.cv = threading.Condition()
 		self.outs = []
-		self.expected = []
 
 	def dump_outs(self):
 		hid_name = os.path.splitext(os.path.basename(self.path))[0]
@@ -183,20 +194,12 @@ class HIDTest(object):
 		if self.hid_replay :
 			self.hid_replay.terminate()
 
-	def get_major_minor(self, string):
-		m = kernel_release_regexp.match(string)
-		if not m:
-			return 0
-		major_r, minor_r = m.groups()
-		major_r, minor_r = int(major_r), int(minor_r)
-		return major_r << 16 | minor_r
-
-	def append_result(self, str_result, result, warning, skipped):
+	def append_result(self, str_result, result, warning):
 		global_lock.acquire()
 		# append the result of the test to the list,
-		tests.append((self.path, (result, warning, skipped)))
+		tests.append((self.path, (result, warning)))
 
-		str_result.append(get_results_count(tests))
+		str_result.append(get_results_count(tests, None))
 		str_result.append("-" * raw_length)
 
 		print '\n'.join(str_result)
@@ -204,56 +207,6 @@ class HIDTest(object):
 
 	def run(self):
 		self.reset()
-		results = None
-		skip = False
-		rname = os.path.splitext(os.path.basename(self.path))[0]
-		for ev_file in ev_files:
-			if rname in ev_file:
-				if not results:
-					results = []
-				results.append(ev_file)
-
-		# In case there are several files, keep the right one
-		kernel_release = self.get_major_minor(os.uname()[2])
-		if results:
-			_results = {}
-			for r in results:
-				basename = os.path.basename(r)
-				rkernel_release = self.get_major_minor(os.path.basename(os.path.dirname(r)))
-				if rkernel_release and fast_mode:
-					if kernel_release == rkernel_release:
-						skip = True
-				if not rkernel_release:
-					rkernel_release = kernel_release
-				if kernel_release < rkernel_release:
-					# ignore dumps from earlier kernels
-					continue
-				if basename not in _results.keys():
-					_results[basename] = r
-				else:
-					prev_kernel_release = self.get_major_minor(os.path.basename(os.path.basename(os.path.dirname(_results[basename]))))
-					if prev_kernel_release < rkernel_release:
-						# overwrite the file only if the kernel release is earlier
-						_results[basename] = r
-			results = _results.values()
-			results.sort()
-
-		# In case we did not matched any output, maybe we should skip the test
-		if not results or len(results) == 0:
-			for skip_file in skip_files:
-				if rname in skip_file:
-					kernel_skip = os.path.basename(os.path.dirname(skip_file))
-					rkernel_release = self.get_major_minor(kernel_skip)
-					if rkernel_release == kernel_release:
-						skip = True
-
-		if skip:
-			print "ignoring test", self.path, "(marked skipped)"
-			self.append_result([], False, False, True)
-			return 1
-
-		self.expected = results
-
 		# acquire the lock so that only this test will get the udev 'add' notifications
 		global_lock.acquire()
 
@@ -264,7 +217,7 @@ class HIDTest(object):
 		global currentRunningHidTest
 		currentRunningHidTest = self
 
-		print "launching test", self.path, "against", results
+		print "launching test", self.path, "against", self.expected
 		self.hid_replay = subprocess.Popen(shlex.split(hid_replay + " -s 1 -1 " + self.path))
 
 		# wait for one device to be added
@@ -325,19 +278,19 @@ class HIDTest(object):
 
 		# append the result of the test to the list,
 		# we only count the warning if the test passed
-		self.append_result(str_result, r, w and r, False)
+		self.append_result(str_result, r, w and r)
 
 		return 0
 
-def get_results_count(tests):
+def get_results_count(tests, skipped_hid_files):
+	global total_tests_count
 	good = 0
 	err = 0
 	warn = 0
 	skipped = 0
-	for file, (r, w, s) in tests:
-		if s:
-			skipped += 1
-			continue
+	if skipped_hid_files:
+		skipped = len(skipped_hid_files)
+	for file, (r, w) in tests:
 		if r: good += 1
 		else: err += 1
 		if w: warn += 1
@@ -365,15 +318,15 @@ def get_results_count(tests):
 	return str_result
 
 def report_results(tests):
-	for file, (r, w, s) in tests:
-		if s:
-			continue
+	for file in skipped:
+		print file, "-> skipped"
+	for file, (r, w) in tests:
 		print file, "->", r,
 		if w:
 			print '(warning raised)'
 		else:
 			print ''
-	print get_results_count(tests)
+	print get_results_count(tests, skipped)
 
 class HIDThread(threading.Thread):
 	count = 1
@@ -381,7 +334,7 @@ class HIDThread(threading.Thread):
 	ok = True
 	lock = threading.Lock()
 
-	def __init__(self, file, delta_timestamp):
+	def __init__(self, file, delta_timestamp, expected):
 		threading.Thread.__init__(self)
 		HIDThread.lock.acquire()
 		if not HIDThread.sema:
@@ -389,7 +342,7 @@ class HIDThread(threading.Thread):
 		HIDThread.lock.release()
 		self.daemon = True
 
-		self.hid = HIDTest(file, delta_timestamp)
+		self.hid = HIDTest(file, delta_timestamp, expected)
 
 	def run(self):
 		HIDThread.sema.acquire()
@@ -417,10 +370,6 @@ def help(argv):
 		kernel series, then skip the test."""
 
 delta_timestamp = 0
-fast_mode = False
-hid_files = []
-ev_files = []
-skip_files = []
 
 def start_xi2detach():
 	# starts xi2detach
@@ -430,7 +379,20 @@ def start_xi2detach():
 	time.sleep(1)
 	return xi2detach
 
-def construct_db(rootdir):
+def skip_test(hid_file, skipping_db):
+	rname = os.path.splitext(os.path.basename(hid_file))[0]
+	for skip_file in skipping_db:
+		if rname in skip_file:
+			return True
+	return False
+
+def construct_db(rootdir, fast_mode):
+	hid_files = []
+	skipping_hid_files = []
+	ev_files = []
+	skip_files = []
+	database = {}
+	ev_dumps = {}
 	# first, retrieve all the .hid, .ev and .skip files in rootdir (first arg if given, otherwise, cwd)
 	for root, dirs, files in os.walk(rootdir):
 		for f in files:
@@ -442,15 +404,78 @@ def construct_db(rootdir):
 			elif f.endswith(".skip"):
 				skip_files.append(path)
 
-def run_tests(list_of_hid_files):
+	# now that we have all the data, organize them:
+	kernel_release = get_major_minor()
+
+	# - the skipped files are the one matching the kernel:
+	skipping_hid_files = []
+	for skip_file in skip_files:
+		kernel_skip = os.path.basename(os.path.dirname(skip_file))
+		rkernel_release = get_major_minor(kernel_skip)
+		if rkernel_release == kernel_release:
+			skipping_hid_files.append(skip_file)
+
+	# - organize the evemu traces:
+	#   * if a dump is from an earlier kernel than the tested one -> skip it
+	#   * keep only the latest dump (from the more recent allowed kernel)
+	for ev_file in ev_files:
+		basename = os.path.basename(ev_file)
+		ev_kernel_release = get_major_minor(os.path.basename(os.path.dirname(ev_file)))
+		if not ev_kernel_release:
+			ev_kernel_release = kernel_release - 1
+		ev_dump = {
+			"path": ev_file,
+			"kernel_release": ev_kernel_release,
+		}
+		# discard dumps from earlier kernels
+		if ev_kernel_release > kernel_release:
+			continue
+		# keep the latest evemu dump
+		if not ev_dumps.has_key(basename) or \
+		   ev_dumps[basename]["kernel_release"] < ev_kernel_release:
+			ev_dumps[basename] = ev_dump
+
+	# - now retrieve the expected evemu traces per hid test
+	for hid_file in hid_files:
+		results = []
+		basename = os.path.splitext(os.path.basename(hid_file))[0]
+		# get all matching evemu dumps
+		for ev_file in ev_dumps.keys():
+			if basename in ev_file:
+				results.append(ev_file)
+		results.sort()
+		database[hid_file] = [ ev_dumps[ev_file] for ev_file in results]
+
+	# - fast mode: skip the matching kernels evemu
+	if fast_mode:
+		for hid_file in hid_files:
+			results = database[hid_file]
+			skip = len(results) > 0
+			for r in results:
+				if r["kernel_release"] != kernel_release:
+					skip = False
+			if skip:
+				skipping_hid_files.append(hid_file)
+
+	return database, skipping_hid_files
+
+def run_tests(list_of_hid_files, database, skipping_db):
+	global total_tests_count, skipped
 	threads = []
 	total_tests_count = len(list_of_hid_files)
 	for file in list_of_hid_files:
+		if skip_test(file, skipping_db):
+			skipped.append(file)
+			continue
+		if not database.has_key(file):
+			# TODO: failure
+			continue
+		expected = [ ev_file["path"] for ev_file in database[file]]
 		if HIDThread.count > 1:
-			thread = HIDThread(file, delta_timestamp)
+			thread = HIDThread(file, delta_timestamp, expected)
 			threads.append(thread)
 			thread.start()
-		elif HIDTest(file, delta_timestamp).run() < 0:
+		elif HIDTest(file, delta_timestamp, expected).run() < 0:
 			break
 	while len(threads) > 0:
 		try:
@@ -465,12 +490,14 @@ def run_tests(list_of_hid_files):
 			HIDThread.ok = False
 			for t in threads:
 				t.terminate()
+	return skipped
 
 def main():
+	fast_mode = False
 	# disable stdout buffering
 	sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
-	optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:f')
+	optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:fd')
 	for opt, arg in optlist:
 		if opt == '-h':
 			help(sys.argv)
@@ -484,6 +511,8 @@ def main():
 				HIDThread.count = 1
 		elif opt == '-f':
 			fast_mode = True
+		elif opt == '-m':
+			pass
 
 	if not os.path.exists("/dev/uhid"):
 		print "It is required to load the uhid kernel module."
@@ -493,18 +522,19 @@ def main():
 	if len(args) > 0:
 		rootdir = args[0]
 
-	construct_db(rootdir)
+	database, skipping_db = construct_db(rootdir, fast_mode)
+	hid_files = database.keys()
+	hid_files.sort()
 
 	xi2detach = start_xi2detach()
 
 	# if specific devices are given, treat them, otherwise, run the test on all .hid
-	hid_files.sort()
 	list_of_hid_files = hid_files
 	if len(args) > 1:
 		list_of_hid_files = args[1:]
 
 	try:
-		run_tests(list_of_hid_files)
+		run_tests(list_of_hid_files, database, skipping_db)
 	finally:
 		report_results(tests)
 		xi2detach.terminate()

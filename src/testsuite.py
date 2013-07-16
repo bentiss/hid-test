@@ -318,14 +318,30 @@ def get_results_count(tests, skipped_hid_files):
 	return str_result
 
 def report_results(tests):
-	for file in skipped:
-		print file, "-> skipped"
-	for file, (r, w) in tests:
-		print file, "->", r,
-		if w:
-			print '(warning raised)'
-		else:
-			print ''
+	passed_without_warns = [file for file, (r, w) in tests if r and not w]
+	passed_with_warns = [file for file, (r, w) in tests if r and w]
+	errors = [file for file, (r, w) in tests if not r]
+
+	if len(skipped) > 0:
+		print "tests skipped ( - ):"
+		for file in skipped:
+			print " - ", file, "-> skipped"
+
+	if len(passed_without_warns) > 0:
+		print "tests passed (   ):"
+		for file in passed_without_warns:
+			print "   ", file, "-> OK"
+
+	if len(passed_with_warns) > 0:
+		print "tests passed with warnings (WW):"
+		for file in passed_with_warns:
+			print "WW:", file, "-> OK"
+
+	if len(errors) > 0:
+		print "tests failed (EE):"
+		for file in errors:
+			print "EE:", file, "-> ERROR"
+
 	print get_results_count(tests, skipped)
 
 class HIDThread(threading.Thread):

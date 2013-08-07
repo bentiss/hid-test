@@ -164,6 +164,17 @@ class AbsInfo(object):
 		if self.resolution == None or other.resolution == None:
 			return matching
 		return matching and self.resolution == other.resolution
+	def __str__(self):
+		str = "A: %s %s %s %s %s " % (self.code, \
+						self.minimum, \
+						self.maximum, \
+						self.fuzz, \
+						self.flat)
+		if self.resolution == None:
+			str += "?"
+		else:
+			str += "%s" % self.resolution
+		return str
 
 class EvemuFile(object):
 	syn_event = Event("0", "0000", "0000", "0")
@@ -174,7 +185,6 @@ class EvemuFile(object):
 
 	def __init__(self, file):
 		self.file = file
-		self.evemu_version = 0
 		self.name = None
 		self.version = EvemuFile.make_version(1, 0)
 		self.absinfo = []
@@ -320,6 +330,8 @@ class EvemuFile(object):
 			return False, warning
 		for i in xrange(len(self.absinfo)):
 			if not self.absinfo[i].match(other.absinfo[i]):
+				if output:
+					print_(str_result, prefix + ': error, got ' + str(other.absinfo[i]) + ' instead of ' + str(self.absinfo[i]))
 				if self.absinfo[i].code == "2f":
 					if output:
 						print_(str_result, prefix + 'This error is related to slot definition, it may be harmless, continuing...')
@@ -474,7 +486,7 @@ def dump_diff(name, events_file):
 	f_number = 0
 	output.write("Evemu version: %d.%d\n" % evemu_file.major_minor())
 	for d in descr:
-		output.write(d)
+		output.write(d + "\n")
 	for time, n, frame in frames:
 		f_number += 1
 		output.write('frame '+str(f_number) + ':\n')

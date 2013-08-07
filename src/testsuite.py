@@ -323,24 +323,24 @@ def report_results(tests):
 	errors = [file for file, (r, w) in tests if not r]
 
 	if len(skipped) > 0:
-		print "tests skipped ( - ):"
+		print "tests skipped (SK):"
 		for file in skipped:
-			print " - ", file, "-> skipped"
+			print "SK:", file
 
 	if len(passed_without_warns) > 0:
-		print "tests passed (   ):"
+		print "tests passed (OK):"
 		for file in passed_without_warns:
-			print "   ", file, "-> OK"
+			print "OK:", file
 
 	if len(passed_with_warns) > 0:
 		print "tests passed with warnings (WW):"
 		for file in passed_with_warns:
-			print "WW:", file, "-> OK"
+			print "WW:", file
 
 	if len(errors) > 0:
 		print "tests failed (EE):"
 		for file in errors:
-			print "EE:", file, "-> ERROR"
+			print "EE:", file
 
 	print get_results_count(tests, skipped)
 

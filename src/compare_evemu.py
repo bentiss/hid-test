@@ -202,7 +202,7 @@ class EvemuFile(object):
 
 		if len(self.frames) == 1:
 			time, n, frame = self.frames[0]
-			if len(frame) == 1 and frame[0] == syn_k_event:
+			if len(frame) == 1 and frame[0] == EvemuFile.syn_k_event:
 				# all keys up event sent on disconnect
 				# that means that no events were sent, we can drop the
 				# results

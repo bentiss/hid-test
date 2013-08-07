@@ -176,7 +176,7 @@ class EvemuFile(object):
 		self.file = file
 		self.evemu_version = 0
 		self.name = None
-		self.version = None
+		self.version = EvemuFile.make_version(1, 0)
 		self.absinfo = []
 		self.frames = []
 		self.extra_descr = []

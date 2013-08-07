@@ -187,6 +187,10 @@ class EvemuFile(object):
 		self.file = file
 		self.name = None
 		self.version = EvemuFile.make_version(1, 0)
+		self.bus = None
+		self.vid = None
+		self.pid = None
+		self.fw_version = None
 		self.absinfo = []
 		self.frames = []
 		self.extra_descr = []
@@ -231,8 +235,14 @@ class EvemuFile(object):
 		elif line.startswith("A: "):
 			self.absinfo.append(AbsInfo(self.version, line[3:]))
 			return
+		elif line.startswith("I: "):
+			self.parse_ids(line[3:])
+			return
 		else:
 			self.extra_descr.append(line)
+
+	def parse_ids(self, line):
+		self.bus, self.vid, self.pid, self.fw_version = line.split()
 
 	@staticmethod
 	def parse_version(string):
@@ -325,6 +335,16 @@ class EvemuFile(object):
 			if output:
 				print_(str_result, prefix + 'comparing two different versions, things may have changed (%s vs %s)'%(other.print_version(), self.print_version()))
 			warning = True
+
+		if self.bus != other.bus \
+			or self.vid != other.vid \
+			or self.pid != other.pid:
+			# dropping the fw_version
+				if output:
+					print_(str_result, prefix + \
+						': error, got I: %s %s %s %s' % (self.bus, self.vid, self.pid, self.fw_version) + \
+						' instead of I: %s %s %s %s' % (other.bus, other.vid, other.pid, other.fw_version))
+				return False, warning
 
 		if len(self.absinfo) != len(other.absinfo):
 			return False, warning
@@ -486,6 +506,7 @@ def dump_diff(name, events_file):
 	f_number = 0
 	output.write("Evemu version: %d.%d\n" % evemu_file.major_minor())
 	output.write("N: %s\n" % evemu_file.name)
+	output.write("I: %s %s %s %s\n" % (evemu_file.bus, evemu_file.vid, evemu_file.pid, evemu_file.fw_version))
 	for d in descr:
 		output.write(d + "\n")
 	for time, n, frame in frames:

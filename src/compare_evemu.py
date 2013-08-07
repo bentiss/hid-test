@@ -246,7 +246,7 @@ class EvemuFile(object):
 		frame.extend(slot.get_non_updated_events())
 
 	def terminate_frame(self, n, trigger, frame, input, time):
-		if len(frame) == 0 and trigger == syn_event:
+		if len(frame) == 0 and trigger == EvemuFile.syn_event:
 			# old kernels can not set HID_QUIRK_NO_INPUT_SYNC, giving from times
 			# to times empty frames
 			return []

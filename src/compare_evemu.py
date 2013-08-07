@@ -139,6 +139,32 @@ class Slot(object):
 			items = []
 		return items
 
+class AbsInfo(object):
+	def __init__(self, version, line):
+		if version >= EvemuFile.make_version(1, 2):
+			self.code, \
+			self.minimum, \
+			self.maximum, \
+			self.fuzz, \
+			self.flat, \
+			self.resolution = line.split()
+		else:
+			self.code, \
+			self.minimum, \
+			self.maximum, \
+			self.fuzz, \
+			self.flat = line.split()
+			self.resolution = None
+	def match(self, other):
+		matching = self.code == other.code \
+			and self.minimum == other.minimum \
+			and self.maximum == other.maximum \
+			and self.fuzz == other.fuzz \
+			and self.flat == other.flat
+		if self.resolution == None or other.resolution == None:
+			return matching
+		return matching and self.resolution == other.resolution
+
 class EvemuFile(object):
 	syn_event = Event("0", "0000", "0000", "0")
 	syn_event.extra = True
@@ -151,6 +177,7 @@ class EvemuFile(object):
 		self.evemu_version = 0
 		self.name = None
 		self.version = None
+		self.absinfo = []
 		self.frames = []
 		self.extra_descr = []
 		self.parse_evemu(file)
@@ -191,6 +218,9 @@ class EvemuFile(object):
 		elif line.startswith("N: "):
 			self.name = line[3:]
 			return
+		elif line.startswith("A: "):
+			self.absinfo.append(AbsInfo(self.version, line[3:]))
+			return
 		else:
 			self.extra_descr.append(line)
 
@@ -198,6 +228,10 @@ class EvemuFile(object):
 	def parse_version(string):
 		string = string.strip()
 		major, minor = string.split('.')
+		return EvemuFile.make_version(major, minor)
+
+	@staticmethod
+	def make_version(major, minor):
 		major = int(major)
 		minor = int(minor)
 		return (major << 16) + minor
@@ -271,18 +305,34 @@ class EvemuFile(object):
 			frame.append(event)
 		return frame, time
 
-	def match_descr(self, other):
+	def match_descr(self, other, output = False, str_result = None, prefix = ""):
+		warning = False
+		if len(self.absinfo) != len(other.absinfo):
+			return False
+		for i in xrange(len(self.absinfo)):
+			if not self.absinfo[i].match(other.absinfo[i]):
+				return False, warning
+
 		s_descr, o_descr = cleanup_properties(self.extra_descr, other.extra_descr)
 		if len(s_descr) != len(o_descr):
-			return False
+			if output:
+				print_(str_result, prefix + 'description differs, got ' + str(len(o_descr)) + ' lines, instead of ' + str(len(s_descr)))
+			return False, warning
+
+		if output and self.name != other.name:
+			print_(str_result, prefix + ': name changed from "' + self.name + '" to "' + other.name + '"')
 
 		for i in xrange(len(s_descr)):
 			if s_descr[i] != o_descr[i]:
+				if output:
+					print_(str_result, prefix + ': error, got ' + str(o_descr[i]) + ' instead of ' + str(s_descr[i]))
 				if s_descr[i].startswith('A: 2f 0'):
+					if output:
+						print_(str_result, prefix + 'This error is related to slot definition, it may be harmless, continuing...')
+					warning = True
 					continue
-				return False
-
-		return True
+				return False, warning
+		return True, warning
 
 def print_(str_result, line):
 	if str_result:
@@ -315,23 +365,10 @@ def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0)
 	last_result = None
 	warning = False
 
-	exp_desc, res_desc = cleanup_properties(exp.extra_descr, res.extra_descr)
+	ret, warning = exp.match_descr(res, True, str_result, prefix)
 
-	if len(exp_desc) != len(res_desc):
-		print_(str_result, prefix + 'description differs, got ' + str(len(res_desc)) + ' lines, instead of ' + str(len(exp_desc)))
-		return False, warning
-
-	if exp.name != res.name:
-		print_(str_result, prefix + ': name changed from "' + exp.name + '" to "' + res.name + '"')
-
-	for i in xrange(len(exp_desc)):
-		if exp_desc[i] != res_desc[i]:
-			print_(str_result, prefix + 'line ' + str(i + 1) + ': error, got ' + str(res_desc[i]) + ' instead of ' + str(exp_desc[i]))
-			if res_desc[i].startswith('A: 2f 0'):
-				print_(str_result, prefix + 'This error is related to slot definition, it may be harmless, continuing...')
-				warning = True
-			else:
-				return False, warning
+	if not ret:
+		return ret, warning
 
 	if len(exp.frames) != len(res.frames):
 		if len(exp.frames) < len(res.frames):
@@ -395,7 +432,7 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 			prefix = ''
 		exp = None
 		for exp_item in exp_list:
-			if res.match_descr(exp_item):
+			if res.match_descr(exp_item)[0]:
 				exp = exp_item
 				break
 

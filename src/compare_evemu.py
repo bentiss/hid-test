@@ -315,8 +315,9 @@ class EvemuFile(object):
 			if output:
 				print_(str_result, prefix + 'comparing two different versions, things may have changed (%s vs %s)'%(other.print_version(), self.print_version()))
 			warning = True
+
 		if len(self.absinfo) != len(other.absinfo):
-			return False
+			return False, warning
 		for i in xrange(len(self.absinfo)):
 			if not self.absinfo[i].match(other.absinfo[i]):
 				if self.absinfo[i].code == "2f":

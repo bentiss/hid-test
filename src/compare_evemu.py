@@ -322,7 +322,7 @@ class EvemuFile(object):
 						input.add_event(slotEv)
 						frame.append(slotEv)
 					input.add_event(event)
-					if event.is_slot:
+					if event.is_slot():
 						slot = input.current_slot
 				else:
 					input.add_event(event)

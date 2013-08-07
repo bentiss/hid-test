@@ -381,9 +381,9 @@ def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0)
 
 	if len(exp.frames) != len(res.frames):
 		if len(exp.frames) < len(res.frames):
-			print_(str_result, prefix + 'too many events, should get only ' + str(len(exp[1])) + ' events instead of ' + str(len(res[1])))
+			print_(str_result, prefix + 'too many events, should get only ' + str(len(exp.frames)) + ' events instead of ' + str(len(res.frames)))
 		else:
-			print_(str_result, prefix + 'too few events, should get ' + str(len(exp[1])) + ' events instead of ' + str(len(res[1])))
+			print_(str_result, prefix + 'too few events, should get ' + str(len(exp.frames)) + ' events instead of ' + str(len(res.frames)))
 		return False, warning
 
 	for i in xrange(len(exp.frames)):

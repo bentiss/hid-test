@@ -319,6 +319,11 @@ class EvemuFile(object):
 			return False
 		for i in xrange(len(self.absinfo)):
 			if not self.absinfo[i].match(other.absinfo[i]):
+				if self.absinfo[i].code == "2f":
+					if output:
+						print_(str_result, prefix + 'This error is related to slot definition, it may be harmless, continuing...')
+					warning = True
+					continue
 				return False, warning
 
 		s_descr, o_descr = cleanup_properties(self.extra_descr, other.extra_descr)
@@ -334,11 +339,6 @@ class EvemuFile(object):
 			if s_descr[i] != o_descr[i]:
 				if output:
 					print_(str_result, prefix + ': error, got ' + str(o_descr[i]) + ' instead of ' + str(s_descr[i]))
-				if s_descr[i].startswith('A: 2f 0'):
-					if output:
-						print_(str_result, prefix + 'This error is related to slot definition, it may be harmless, continuing...')
-					warning = True
-					continue
 				return False, warning
 		return True, warning
 

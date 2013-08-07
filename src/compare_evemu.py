@@ -447,9 +447,9 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 		if not exp:
 			print_(str_result, prefix + 'no matching device')
 			warning = True
-			if len(data) > 0:
+			if len(res.frames) > 0:
 				matches = False
-				print_(str_result, prefix + str(len(data)) + ' events received -> test failed')
+				print_(str_result, prefix + str(len(res.frames)) + ' events received -> test failed')
 			else:
 				print_(str_result, prefix + 'no events received -> ignoring')
 		else:

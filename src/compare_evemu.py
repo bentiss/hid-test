@@ -149,8 +149,9 @@ class EvemuFile(object):
 	def __init__(self, file):
 		self.file = file
 		self.evemu_version = 0
+		self.version = None
 		self.frames = []
-		self.descr = []
+		self.extra_descr = []
 		self.parse_evemu(file)
 
 	def parse_evemu(self, file):
@@ -160,14 +161,12 @@ class EvemuFile(object):
 		n = 1
 		time = "0"
 		for line in file.readlines():
-			if line.startswith('#'):
-				continue
 			if line.startswith('E:'):
 				# remove end of lines comments
 				stripped_line = line[:line.find('#')].rstrip('\t ')
 				frame, time = self.parse_event(stripped_line, frame, input, slot, n)
 			else:
-				self.descr.append(line)
+				self.parse_descr(line)
 			n += 1
 		if slot:
 			EvemuFile.terminate_slot(slot, frame)
@@ -180,6 +179,28 @@ class EvemuFile(object):
 				# that means that no events were sent, we can drop the
 				# results
 				self.frames = []
+
+	def parse_descr(self, line):
+		if line.startswith("# EVEMU "):
+			self.version = EvemuFile.parse_version(line[7:])
+			return
+		elif line.startswith('#'):
+			return
+		else:
+			self.extra_descr.append(line)
+
+	@staticmethod
+	def parse_version(string):
+		string = string.strip()
+		major, minor = string.split('.')
+		major = int(major)
+		minor = int(minor)
+		return (major << 16) + minor
+
+	def major_minor(self):
+		major = self.version >> 16
+		minor = self.version - (major << 16)
+		return major, minor
 
 	@staticmethod
 	def terminate_slot(slot, frame):
@@ -292,7 +313,7 @@ def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0)
 	last_result = None
 	warning = False
 
-	exp_desc, res_desc = cleanup_properties(exp.descr, res.descr)
+	exp_desc, res_desc = cleanup_properties(exp.extra_descr, res.extra_descr)
 
 	if len(exp_desc) != len(res_desc):
 		print_(str_result, prefix + 'description differs, got ' + str(len(res_desc)) + ' lines, instead of ' + str(len(exp_desc)))
@@ -402,9 +423,10 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 def dump_diff(name, events_file):
 	events_file.seek(0)
 	evemu_file = EvemuFile(events_file)
-	descr, frames = evemu_file.descr, evemu_file.frames
+	descr, frames = evemu_file.extra_descr, evemu_file.frames
 	output = open(name, 'w')
 	f_number = 0
+	output.write("Evemu version: %d.%d\n" % evemu_file.major_minor())
 	for d in descr:
 		output.write(d)
 	for time, n, frame in frames:

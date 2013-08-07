@@ -139,25 +139,53 @@ class Slot(object):
 			items = []
 		return items
 
-def parse_evemu(file):
-	descr = []
-	frames = []
-	frame = []
-	input = InputObj()
-	slot = input.current_slot
-	n = 1
-	time = "0"
-
+class EvemuFile(object):
 	syn_event = Event("0", "0000", "0000", "0")
 	syn_event.extra = True
 
 	syn_k_event = Event("0", "0000", "0000", "1")
 	syn_k_event.extra = True
 
-	def terminate_slot(slot):
+	def __init__(self, file):
+		self.file = file
+		self.evemu_version = 0
+		self.frames = []
+		self.descr = []
+		self.parse_evemu(file)
+
+	def parse_evemu(self, file):
+		frame = []
+		input = InputObj()
+		slot = input.current_slot
+		n = 1
+		time = "0"
+		for line in file.readlines():
+			if line.startswith('#'):
+				continue
+			if line.startswith('E:'):
+				# remove end of lines comments
+				stripped_line = line[:line.find('#')].rstrip('\t ')
+				frame, time = self.parse_event(stripped_line, frame, input, slot, n)
+			else:
+				self.descr.append(line)
+			n += 1
+		if slot:
+			EvemuFile.terminate_slot(slot, frame)
+		self.terminate_frame(n, None, frame, input, time)
+
+		if len(self.frames) == 1:
+			time, n, frame = self.frames[0]
+			if len(frame) == 1 and frame[0] == syn_k_event:
+				# all keys up event sent on disconnect
+				# that means that no events were sent, we can drop the
+				# results
+				self.frames = []
+
+	@staticmethod
+	def terminate_slot(slot, frame):
 		frame.extend(slot.get_non_updated_events())
 
-	def terminate_frame(n, trigger):
+	def terminate_frame(self, n, trigger, frame, input, time):
 		if len(frame) == 0 and trigger == syn_event:
 			# old kernels can not set HID_QUIRK_NO_INPUT_SYNC, giving from times
 			# to times empty frames
@@ -168,74 +196,54 @@ def parse_evemu(file):
 			if trigger:
 				frame.append(trigger)
 			# EV_SYN(1) are a pain: adding them, no matter the device says
-			if syn_k_event not in frame:
-				frame.append(syn_k_event)
-			frames.append((float(time), n, frame))
+			if EvemuFile.syn_k_event not in frame:
+				frame.append(EvemuFile.syn_k_event)
+			self.frames.append((float(time), n, frame))
 		return []
 
-	for line in file.readlines():
-		if line.startswith('#'):
-			continue
-		if line.startswith('E:'):
-			# remove end of lines comments
-			stripped_line = line[:line.find('#')].rstrip('\t ')
-			e, time, type, code, value = stripped_line.split(' ')
-			event = Event(time, type, code, value)
+	def parse_event(self, line, frame, input, slot, n):
+		e, time, type, code, value = line.split(' ')
+		event = Event(time, type, code, value)
 
-			if event.type == 0 and event.code == 0:
-				if event == syn_event:
-					# EV_SYN
-					if slot:
-						terminate_slot(slot)
-					frame = terminate_frame(n, event)
-				elif event == syn_k_event:
-					if syn_k_event not in frame:
-						frame.append(event)
-				else:
+		if event.type == 0 and event.code == 0:
+			if event == EvemuFile.syn_event:
+				# EV_SYN
+				if slot:
+					EvemuFile.terminate_slot(slot, frame)
+				frame = self.terminate_frame(n, event, frame, input, time)
+			elif event == EvemuFile.syn_k_event:
+				if EvemuFile.syn_k_event not in frame:
 					frame.append(event)
 			else:
-				c = event.code
-				if event.type == 1:
-					# BTN event
-					if event.value == 2:
-						# key repeat event, drop it
-						continue
-				elif event.type == 3:
-					# absolute event
-					if event.is_mt_event():
-						# MT event
-						if event.is_slot():
-							if slot:
-								terminate_slot(slot)
-						elif not slot.contains(0x2f):
-							# if the slot was not given, then add it to avoid
-							# missmatches if slots are not given in the very same order
-							slotEv = Event('0', '0003', '002f', str(slot.slot_number))
-							slotEv.extra = True
-							input.add_event(slotEv)
-							frame.append(slotEv)
-						input.add_event(event)
-						if event.is_slot:
-							slot = input.current_slot
-					else:
-						input.add_event(event)
 				frame.append(event)
 		else:
-			descr.append(line)
-		n += 1
-
-	if slot:
-		terminate_slot(slot)
-	terminate_frame(n, None)
-
-	if len(frames) == 1:
-		time, n, frame = frames[0]
-		if len(frame) == 1 and frame[0] == syn_k_event:
-			# all keys up event sent on disconnect
-			# that means that no events were sent, we can drop the
-			# results
-			frames = []
-	return descr, frames
+			c = event.code
+			if event.type == 1:
+				# BTN event
+				if event.value == 2:
+					# key repeat event, drop it
+					return
+			elif event.type == 3:
+				# absolute event
+				if event.is_mt_event():
+					# MT event
+					if event.is_slot():
+						if slot:
+							EvemuFile.terminate_slot(slot, frame)
+					elif not slot.contains(0x2f):
+						# if the slot was not given, then add it to avoid
+						# missmatches if slots are not given in the very same order
+						slotEv = Event('0', '0003', '002f', str(slot.slot_number))
+						slotEv.extra = True
+						input.add_event(slotEv)
+						frame.append(slotEv)
+					input.add_event(event)
+					if event.is_slot:
+						slot = input.current_slot
+				else:
+					input.add_event(event)
+			frame.append(event)
+		return frame, time
 
 def print_(str_result, line):
 	if str_result:
@@ -284,7 +292,7 @@ def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0)
 	last_result = None
 	warning = False
 
-	exp_desc, res_desc = cleanup_properties(exp[0], res[0])
+	exp_desc, res_desc = cleanup_properties(exp.descr, res.descr)
 
 	if len(exp_desc) != len(res_desc):
 		print_(str_result, prefix + 'description differs, got ' + str(len(res_desc)) + ' lines, instead of ' + str(len(exp_desc)))
@@ -302,16 +310,16 @@ def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0)
 			else:
 				return False, warning
 
-	if len(exp[1]) != len(res[1]):
-		if len(exp[1]) < len(res[1]):
+	if len(exp.frames) != len(res.frames):
+		if len(exp.frames) < len(res.frames):
 			print_(str_result, prefix + 'too many events, should get only ' + str(len(exp[1])) + ' events instead of ' + str(len(res[1])))
 		else:
 			print_(str_result, prefix + 'too few events, should get ' + str(len(exp[1])) + ' events instead of ' + str(len(res[1])))
 		return False, warning
 
-	for i in xrange(len(exp[1])):
-		exp_time, exp_line, exp_events = exp[1][i]
-		res_time, res_line, res_events = res[1][i]
+	for i in xrange(len(exp.frames)):
+		exp_time, exp_line, exp_events = exp.frames[i]
+		res_time, res_line, res_events = res.frames[i]
 		if len(exp_events) != len(res_events):
 			print_(str_result, prefix + 'line ' + str(res_line) + ', frame ' + str(i + 1) + ': got ' + str(len(res_events)) + ' events instead of ' + str(len(exp_events)))
 			return False, warning
@@ -350,9 +358,9 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 		return False, warning
 
 	# parse both sets
-	res_list = [ parse_evemu(res) for res in result_list]
+	res_list = [ EvemuFile(res) for res in result_list]
 	files_exp_list = [ open(exp, 'r') for exp in expected_list]
-	exp_list = [ parse_evemu(exp) for exp in files_exp_list]
+	exp_list = [ EvemuFile(exp) for exp in files_exp_list]
 	for f in files_exp_list:
 		f.close()
 
@@ -393,7 +401,8 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 
 def dump_diff(name, events_file):
 	events_file.seek(0)
-	descr, frames = parse_evemu(events_file)
+	evemu_file = EvemuFile(events_file)
+	descr, frames = evemu_file.descr, evemu_file.frames
 	output = open(name, 'w')
 	f_number = 0
 	for d in descr:
@@ -413,7 +422,7 @@ def dump_diff(name, events_file):
 if __name__ == '__main__':
 	if len(sys.argv) == 2:
 		f0 = open(sys.argv[1])
-		parsed = parse_evemu(f0)
+		parsed = EvemuFile(f0)
 		name = os.path.basename(sys.argv[1]) + ".evd"
 		print "dumping output in:", name
 		dump_diff(name, f0)
@@ -421,7 +430,7 @@ if __name__ == '__main__':
 		sys.exit(0)
 	f0 = open(sys.argv[1])
 	f1 = open(sys.argv[2])
-	success, warning = compare_files(parse_evemu(f0), parse_evemu(f1))
+	success, warning = compare_files(EvemuFile(f0), EvemuFile(f1))
 	if not success:
 		print "test failed, dumping outputs in:"
 		name = os.path.basename(sys.argv[1]) + ".evd"

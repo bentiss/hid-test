@@ -241,6 +241,10 @@ class EvemuFile(object):
 		minor = self.version - (major << 16)
 		return major, minor
 
+	def print_version(self):
+		major, minor = self.major_minor()
+		return "%d.%d"%(major, minor)
+
 	@staticmethod
 	def terminate_slot(slot, frame):
 		frame.extend(slot.get_non_updated_events())
@@ -307,6 +311,10 @@ class EvemuFile(object):
 
 	def match_descr(self, other, output = False, str_result = None, prefix = ""):
 		warning = False
+		if self.version != other.version:
+			if output:
+				print_(str_result, prefix + 'comparing two different versions, things may have changed (%s vs %s)'%(other.print_version(), self.print_version()))
+			warning = True
 		if len(self.absinfo) != len(other.absinfo):
 			return False
 		for i in xrange(len(self.absinfo)):

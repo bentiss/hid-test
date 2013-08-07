@@ -206,7 +206,7 @@ class EvemuFile(object):
 			if line.startswith('E:'):
 				# remove end of lines comments
 				stripped_line = line[:line.find('#')].rstrip('\t ')
-				frame, time = self.parse_event(stripped_line, frame, input, slot, n)
+				frame, slot, time = self.parse_event(stripped_line, frame, input, slot, n)
 			else:
 				self.parse_descr(line)
 			n += 1
@@ -306,7 +306,7 @@ class EvemuFile(object):
 				# BTN event
 				if event.value == 2:
 					# key repeat event, drop it
-					return
+					return frame, slot, time
 			elif event.type == 3:
 				# absolute event
 				if event.is_mt_event():
@@ -327,7 +327,7 @@ class EvemuFile(object):
 				else:
 					input.add_event(event)
 			frame.append(event)
-		return frame, time
+		return frame, slot, time
 
 	def match_descr(self, other, output = False, str_result = None, prefix = ""):
 		warning = False

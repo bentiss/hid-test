@@ -485,6 +485,7 @@ def dump_diff(name, events_file):
 	output = open(name, 'w')
 	f_number = 0
 	output.write("Evemu version: %d.%d\n" % evemu_file.major_minor())
+	output.write("N: %s\n" % evemu_file.name)
 	for d in descr:
 		output.write(d + "\n")
 	for time, n, frame in frames:

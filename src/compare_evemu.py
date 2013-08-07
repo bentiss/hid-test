@@ -149,6 +149,7 @@ class EvemuFile(object):
 	def __init__(self, file):
 		self.file = file
 		self.evemu_version = 0
+		self.name = None
 		self.version = None
 		self.frames = []
 		self.extra_descr = []
@@ -181,10 +182,14 @@ class EvemuFile(object):
 				self.frames = []
 
 	def parse_descr(self, line):
+		line = line.strip()
 		if line.startswith("# EVEMU "):
 			self.version = EvemuFile.parse_version(line[7:])
 			return
 		elif line.startswith('#'):
+			return
+		elif line.startswith("N: "):
+			self.name = line[3:]
 			return
 		else:
 			self.extra_descr.append(line)
@@ -266,6 +271,19 @@ class EvemuFile(object):
 			frame.append(event)
 		return frame, time
 
+	def match_descr(self, other):
+		s_descr, o_descr = cleanup_properties(self.extra_descr, other.extra_descr)
+		if len(s_descr) != len(o_descr):
+			return False
+
+		for i in xrange(len(s_descr)):
+			if s_descr[i] != o_descr[i]:
+				if s_descr[i].startswith('A: 2f 0'):
+					continue
+				return False
+
+		return True
+
 def print_(str_result, line):
 	if str_result:
 		str_result.append(line)
@@ -291,22 +309,6 @@ def cleanup_properties(expected, result):
 				result = [d for d in result if not d.startswith("P:")]
 	return expected, result
 
-def compare_desc(expected, result):
-	expected, result = cleanup_properties(expected, result)
-	if len(expected) != len(result):
-		return False
-
-	for i in xrange(len(expected)):
-		if expected[i] != result[i]:
-			if expected[i].startswith('N: '):
-				# ignore naming differences
-				continue
-			if expected[i].startswith('A: 2f 0'):
-				continue
-			return False
-
-	return True
-
 def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0):
 	''' returns ok, warning '''
 	last_expected = None
@@ -319,11 +321,11 @@ def compare_files(exp, res, str_result = None, prefix = '', delta_timestamp = 0)
 		print_(str_result, prefix + 'description differs, got ' + str(len(res_desc)) + ' lines, instead of ' + str(len(exp_desc)))
 		return False, warning
 
+	if exp.name != res.name:
+		print_(str_result, prefix + ': name changed from "' + exp.name + '" to "' + res.name + '"')
+
 	for i in xrange(len(exp_desc)):
 		if exp_desc[i] != res_desc[i]:
-			if res_desc[i].startswith('N: '):
-				print_(str_result, prefix + ': name changed from "' + str(exp_desc[i])[3:].strip() + '" to "' + str(res_desc[i])[3:].strip() + '"')
-				continue
 			print_(str_result, prefix + 'line ' + str(i + 1) + ': error, got ' + str(res_desc[i]) + ' instead of ' + str(exp_desc[i]))
 			if res_desc[i].startswith('A: 2f 0'):
 				print_(str_result, prefix + 'This error is related to slot definition, it may be harmless, continuing...')
@@ -391,11 +393,9 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 		prefix = 'output #' + str(i) + ': '
 		if len(res_list) == 1:
 			prefix = ''
-		desc, data = res
 		exp = None
 		for exp_item in exp_list:
-			exp_desc, d = exp_item
-			if compare_desc(desc, exp_desc):
+			if res.match_descr(exp_item):
 				exp = exp_item
 				break
 

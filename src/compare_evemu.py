@@ -509,6 +509,8 @@ def dump_diff(name, events_file):
 	output.write("I: %s %s %s %s\n" % (evemu_file.bus, evemu_file.vid, evemu_file.pid, evemu_file.fw_version))
 	for d in descr:
 		output.write(d + "\n")
+	for absinfo in evemu_file.absinfo:
+		output.write("%s\n" % absinfo)
 	for time, n, frame in frames:
 		f_number += 1
 		output.write('frame '+str(f_number) + ':\n')

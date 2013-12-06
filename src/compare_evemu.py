@@ -508,10 +508,15 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 	return matches, warning
 
 def dump_diff(name, events_file):
+	to_close = []
+	if isinstance(events_file, str):
+		events_file = open(events_file, 'r')
+		to_close.append(events_file)
 	events_file.seek(0)
 	evemu_file = EvemuFile(events_file)
 	descr, frames = evemu_file.extra_descr, evemu_file.frames
 	output = open(name, 'w')
+	to_close.append(output)
 	f_number = 0
 	output.write("Evemu version: %d.%d\n" % evemu_file.major_minor())
 	output.write("N: %s\n" % evemu_file.name)
@@ -530,7 +535,8 @@ def dump_diff(name, events_file):
 			if event.extra:
 				end = '*\n'
 			output.write('    '+ str(frame[i]) + ' '*(30 - len(str(frame[i]))) + '# ' + stype + ' / ' + scode + end)
-	output.close()
+	for f in to_close:
+		f.close()
 
 if __name__ == '__main__':
 	if len(sys.argv) == 2:

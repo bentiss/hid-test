@@ -404,7 +404,7 @@ class HIDThread(threading.Thread):
 	ok = True
 	lock = threading.Lock()
 
-	def __init__(self, file, delta_timestamp, expected):
+	def __init__(self, file, delta_timestamp, expected, simple_evemu_mode):
 		threading.Thread.__init__(self)
 		HIDThread.lock.acquire()
 		if not HIDThread.sema:
@@ -412,7 +412,10 @@ class HIDThread(threading.Thread):
 		HIDThread.lock.release()
 		self.daemon = True
 
-		self.hid = HIDTestAndCompare(file, delta_timestamp, expected)
+		if simple_evemu_mode:
+			self.hid = HIDTest(file)
+		else:
+			self.hid = HIDTestAndCompare(file, delta_timestamp, expected)
 
 	def run(self):
 		HIDThread.sema.acquire()
@@ -436,6 +439,8 @@ def help(argv):
 	-tS	Print a warning if the timestamps between two frames is greater than S.
 		Example: "-t0.01".
 		If S is 0, then timestamps are ignored (default behavior).
+	-E	"Evemu mode": Do not compare, just output the evemu outputs in
+		the current directory.
 	-f	"fast mode": if a device already has an expected output from the same
 		kernel series, then skip the test."""
 
@@ -529,7 +534,7 @@ def construct_db(rootdir, fast_mode):
 
 	return database, skipping_hid_files
 
-def run_tests(list_of_hid_files, database, skipping_db):
+def run_tests(list_of_hid_files, database, simple_evemu_mode, skipping_db):
 	global total_tests_count, skipped
 	threads = []
 	total_tests_count = len(list_of_hid_files)
@@ -550,11 +555,16 @@ def run_tests(list_of_hid_files, database, skipping_db):
 			continue
 		expected = [ ev_file["path"] for ev_file in database[file]]
 		if HIDThread.count > 1:
-			thread = HIDThread(file, delta_timestamp, expected)
+			thread = HIDThread(file, delta_timestamp, expected, simple_evemu_mode)
 			threads.append(thread)
 			thread.start()
-		elif HIDTestAndCompare(file, delta_timestamp, expected).run() < 0:
-			break
+		else:
+			if simple_evemu_mode:
+				if HIDTest(file).run() < 0:
+					break
+			else:
+				if HIDTestAndCompare(file, delta_timestamp, expected).run() < 0:
+					break
 	while len(threads) > 0:
 		try:
 			# Join all threads using a timeout so it doesn't block
@@ -572,10 +582,11 @@ def run_tests(list_of_hid_files, database, skipping_db):
 
 def main():
 	fast_mode = False
+	simple_evemu_mode = False
 	# disable stdout buffering
 	sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
-	optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:fd')
+	optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:fdE')
 	for opt, arg in optlist:
 		if opt == '-h':
 			help(sys.argv)
@@ -587,6 +598,8 @@ def main():
 			if HIDThread.count < 1:
 				print "the number of threads can not be less than one. Disabling threading launches."
 				HIDThread.count = 1
+		elif opt == '-E':
+			simple_evemu_mode = True
 		elif opt == '-f':
 			fast_mode = True
 		elif opt == '-m':
@@ -612,9 +625,10 @@ def main():
 		list_of_hid_files = args[1:]
 
 	try:
-		run_tests(list_of_hid_files, database, skipping_db)
+		run_tests(list_of_hid_files, database, simple_evemu_mode, skipping_db)
 	finally:
-		report_results(tests)
+		if not simple_evemu_mode:
+			report_results(tests)
 		xi2detach.terminate()
 
 if __name__ == "__main__":

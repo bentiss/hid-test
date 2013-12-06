@@ -36,7 +36,13 @@ global_lock = threading.Lock()
 
 raw_length = 78
 
-class HIDTest(object):
+class HIDBase(object):
+	def dump_outs(self):
+		return []
+	def close(self):
+		pass
+
+class HIDTest(HIDBase):
 	running = True
 
 	instances = []
@@ -234,12 +240,17 @@ class HIDTest(object):
 		self.close()
 		return 0
 
-class HIDTestAndCompare(HIDTest):
-	def __init__(self, path, result_database, delta_timestamp):
-		super(HIDTestAndCompare, self).__init__(path)
+class Compare(object):
+	def __init__(self, path, expected, results, result_database, delta_timestamp, hid_base):
 		self.delta_timestamp = delta_timestamp
 		self.result_database = result_database
-		self.expected = result_database.get_expected(path)
+		self.expected = expected
+		self.outs = results
+		self.path = path
+		self.hid_base = hid_base
+
+	def dump_outs(self):
+		return self.hid_base.dump_outs()
 
 	def dump_diffs(self):
 		hid_name = os.path.splitext(os.path.basename(self.path))[0]
@@ -272,11 +283,7 @@ class HIDTestAndCompare(HIDTest):
 		print '\n'.join(str_result)
 		global_lock.release()
 
-	def print_launch(self):
-		print "launching test", self.path, "against", self.expected
-
 	def run(self):
-		self.run_test()
 		basename = os.path.basename(self.path)
 		name_length = len(basename) + 2
 		prev = (raw_length - name_length) / 2
@@ -300,13 +307,28 @@ class HIDTestAndCompare(HIDTest):
 			str_result.append("success")
 
 		# close the captures so that the tmpfiles are destroyed
-		self.close()
+		self.hid_base.close()
 
 		# append the result of the test to the list,
 		# we only count the warning if the test passed
 		self.append_result(str_result, r, w and r)
 
 		return 0
+
+class HIDTestAndCompare(HIDTest):
+	def __init__(self, path, result_database, delta_timestamp):
+		super(HIDTestAndCompare, self).__init__(path)
+		self.delta_timestamp = delta_timestamp
+		self.result_database = result_database
+		self.expected = result_database.get_expected(path)
+		self.compare = None
+
+	def print_launch(self):
+		print "launching test", self.path, "against", self.expected
+
+	def run(self):
+		self.run_test()
+		return Compare(self.path, self.expected, self.outs, self.result_database, self.delta_timestamp, self).run()
 
 class HIDThread(threading.Thread):
 	count = 1

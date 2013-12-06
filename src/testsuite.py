@@ -148,12 +148,15 @@ def main():
 	database = HIDTestDatabase(rootdir, kernel_release, fast_mode)
 	hid_files = database.get_hid_files()
 
-	xi2detach = start_xi2detach()
-
 	# if specific devices are given, treat them, otherwise, run the test on all .hid
 	list_of_hid_files = hid_files
 	if len(args) > 1:
 		list_of_hid_files = args[1:]
+	if len(list_of_hid_files) == 0:
+		help(sys.argv)
+		sys.exit(1)
+
+	xi2detach = start_xi2detach()
 
 	try:
 		run_tests(list_of_hid_files, database, simple_evemu_mode, delta_timestamp)

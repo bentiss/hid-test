@@ -459,10 +459,19 @@ def compare_sets(expected_list, result_list, str_result = None, delta_timestamp 
 		return False, warning
 
 	# parse both sets
-	res_list = [ EvemuFile(res) for res in result_list]
-	files_exp_list = [ open(exp, 'r') for exp in expected_list]
-	exp_list = [ EvemuFile(exp) for exp in files_exp_list]
-	for f in files_exp_list:
+	res_list = []
+	exp_list = []
+	opened = []
+	for res in result_list:
+		if not isinstance(res, file):
+			res = open(res, 'r')
+			opened.append(res)
+		res_list.append(EvemuFile(res))
+	for exp in expected_list:
+		exp = open(exp, 'r')
+		opened.append(exp)
+		exp_list.append(EvemuFile(exp))
+	for f in opened:
 		f.close()
 
 	i = 0

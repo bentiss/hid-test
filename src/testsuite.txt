@@ -54,6 +54,10 @@ OPTIONS
 	Print a warning if the timestamps between two frames is greater than S.
 	If S is 0, then timestamps are ignored (default behavior).
 
+*-E*::
+	"Evemu mode": Do not compare, just output the evemu outputs in
+	the current directory.
+
 PARAMETERS
 ----------
 

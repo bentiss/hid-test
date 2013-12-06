@@ -461,7 +461,7 @@ def skip_test(hid_file, skipping_db):
 			return True
 	return False
 
-def construct_db(rootdir, fast_mode):
+def construct_db(rootdir, fast_mode, kernel_release):
 	hid_files = []
 	skipping_hid_files = []
 	ev_files = []
@@ -480,7 +480,6 @@ def construct_db(rootdir, fast_mode):
 				skip_files.append(path)
 
 	# now that we have all the data, organize them:
-	kernel_release = get_major_minor()
 
 	# - the skipped files are the one matching the kernel:
 	skipping_hid_files = []
@@ -613,7 +612,9 @@ def main():
 	if len(args) > 0:
 		rootdir = args[0]
 
-	database, skipping_db = construct_db(rootdir, fast_mode)
+	kernel_release = get_major_minor()
+
+	database, skipping_db = construct_db(rootdir, fast_mode, kernel_release)
 	hid_files = database.keys()
 	hid_files.sort()
 

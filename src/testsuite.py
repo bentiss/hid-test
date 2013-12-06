@@ -37,16 +37,8 @@ hid_replay_path = "/usr/bin"
 hid_replay_cmd = "hid-replay"
 hid_replay = hid_replay_path + '/' + hid_replay_cmd
 
-monitor = pyudev.Monitor.from_netlink(context)
-monitor.filter_by('input')
-
-global currentRunningHidTest
-currentRunningHidTest = None
-nodes = {}
 
 global_lock = threading.Lock()
-global_condition = threading.Condition()
-global_condition_op = False
 
 raw_length = 78
 
@@ -56,81 +48,11 @@ total_tests_count = 0
 global skipped
 skipped = []
 
-def log_event(action, device):
-	if 'event' in device.sys_name:
-#		print action, device, device.sys_name
-		if action == 'add':
-			if not currentRunningHidTest:
-				return
-
-			tmp = os.tmpfile()
-
-			# get node attributes
-			dev_path = "/dev/input/" + device.sys_name.encode('ascii')
-			if subprocess.call(shlex.split("evemu-describe " + dev_path), stdout=tmp):
-				# the device has already been unplugged
-				return
-
-			prev_pos = tmp.tell()
-			tmp.seek(0)
-			first_line = tmp.readline()
-			if first_line.startswith("# EVEMU"):
-				# FIXME: check evemu > 1.1, but as there is no release with 1.0...
-				# earlier evemu drop the description in evemu-record too
-				tmp.close()
-				tmp = os.tmpfile()
-			else:
-				tmp.seek(prev_pos)
-
-			# start capturing events
-			p = subprocess.Popen(shlex.split("evemu-record " + dev_path), stderr=subprocess.PIPE, stdout=tmp)
-
-			# store it for later
-			nodes[device.sys_name] = tmp, p, currentRunningHidTest
-			currentRunningHidTest.nodes[device.sys_name] = tmp, p, currentRunningHidTest
-
-			# notify the current hid test that one device has been added
-			global_condition.acquire()
-			global global_condition_op
-			global_condition_op = True
-			global_condition.notify()
-			global_condition.release()
-
-		elif action == 'remove':
-			# get corresponding capturing process in background
-			try:
-				result, p, hid = nodes[device.sys_name]
-			except KeyError:
-				# not a registered device => we don't care
-				return
-
-			# wait for it to terminate
-			p.wait()
-
-			# get the name of the node
-			result.seek(0)
-			name = None
-			for l in result.readlines():
-				if "Input device name" in l:
-					name = l.replace("Input device name: \"", '')[:-2]
-					break
-
-			# reset the output so that it can be re-read later
-			result.seek(0)
-
-			# notify test_hid that we are done with the capture of this node
-			hid.cv.acquire()
-			hid.nodes_ready.append((device.sys_name, name, result))
-			del nodes[device.sys_name]
-			del hid.nodes[device.sys_name]
-			hid.cv.notify()
-			hid.cv.release()
-
-
-observer = pyudev.MonitorObserver(monitor, log_event)
-observer.start()
-
 tests = []
+
+def udev_event(action, device):
+	if 'event' in device.sys_name:
+		HIDTest.event_udev_event(action, device)
 
 def get_major_minor(string = os.uname()[2]):
 	kernel_release_regexp = re.compile(r"(\d+)\.(\d+)[^\d]*")
@@ -144,18 +66,26 @@ def get_major_minor(string = os.uname()[2]):
 
 class HIDTest(object):
 	running = True
+
+	current = None
+	event_mappings = {}
+
 	def __init__(self, path, delta_timestamp, expected):
 		self.path = path
-		self.reset()
-		self.hid_replay = None
 		self.delta_timestamp = delta_timestamp
 		self.expected = expected
 
+		self.condition = threading.Condition()
+
+		self.reset()
+
 	def reset(self):
+		self.hid_replay = None
 		self.nodes = {}
 		self.nodes_ready = []
 		self.cv = threading.Condition()
 		self.outs = []
+		self.condition_op = False
 
 	def dump_outs(self):
 		hid_name = os.path.splitext(os.path.basename(self.path))[0]
@@ -205,6 +135,79 @@ class HIDTest(object):
 		print '\n'.join(str_result)
 		global_lock.release()
 
+	@classmethod
+	def event_udev_event(cls, action, device):
+		# we maintain an association event node / uhid node
+		if not cls.event_mappings.has_key(device.sys_path):
+			cls.event_mappings[device.sys_path] = cls.current
+		cls.event_mappings[device.sys_path].__event_udev_event(action, device)
+
+		if action == "remove":
+			del(cls.event_mappings[device.sys_path])
+
+	def __event_udev_event(self, action, device):
+#		print action, device, device.sys_name
+		if action == 'add':
+			tmp = os.tmpfile()
+
+			# get node attributes
+			dev_path = "/dev/input/" + device.sys_name.encode('ascii')
+			if subprocess.call(shlex.split("evemu-describe " + dev_path), stdout=tmp):
+				# the device has already been unplugged
+				return
+
+			prev_pos = tmp.tell()
+			tmp.seek(0)
+			first_line = tmp.readline()
+			if first_line.startswith("# EVEMU"):
+				# FIXME: check evemu > 1.1, but as there is no release with 1.0...
+				# earlier evemu drop the description in evemu-record too
+				tmp.close()
+				tmp = os.tmpfile()
+			else:
+				tmp.seek(prev_pos)
+
+			# start capturing events
+			p = subprocess.Popen(shlex.split("evemu-record " + dev_path), stderr=subprocess.PIPE, stdout=tmp)
+
+			# store it for later
+			self.nodes[device.sys_name] = tmp, p
+
+			# notify the current hid test that one device has been added
+			self.condition.acquire()
+			self.condition_op = True
+			self.condition.notify()
+			self.condition.release()
+
+		elif action == 'remove':
+			# get corresponding capturing process in background
+			try:
+				result, p = self.nodes[device.sys_name]
+			except KeyError:
+				# not a registered device => we don't care
+				return
+
+			# wait for it to terminate
+			p.wait()
+
+			# get the name of the node
+			result.seek(0)
+			name = None
+			for l in result.readlines():
+				if "Input device name" in l:
+					name = l.replace("Input device name: \"", '')[:-2]
+					break
+
+			# reset the output so that it can be re-read later
+			result.seek(0)
+
+			# notify test_hid that we are done with the capture of this node
+			self.cv.acquire()
+			self.nodes_ready.append((device.sys_name, name, result))
+			del self.nodes[device.sys_name]
+			self.cv.notify()
+			self.cv.release()
+
 	def run(self):
 		self.reset()
 		# acquire the lock so that only this test will get the udev 'add' notifications
@@ -214,25 +217,24 @@ class HIDTest(object):
 			global_lock.release()
 			return -1
 
-		global currentRunningHidTest
-		currentRunningHidTest = self
+		# we accept adding new event nodes
+		HIDTest.current = self
 
 		print "launching test", self.path, "against", self.expected
 		self.hid_replay = subprocess.Popen(shlex.split(hid_replay + " -s 1 -1 " + self.path))
 
-		# wait for one device to be added
-		global_condition.acquire()
-		global global_condition_op
-		if not global_condition_op:
-			global_condition.wait()
-		global_condition_op = False
-		global_condition.release()
+		# wait for one input node to be created
+		self.condition.acquire()
+		if not self.condition_op:
+			self.condition.wait()
+		self.condition_op = False
+		self.condition.release()
 
 		# wait 1 more second before releasing the lock, in case others
 		# devices appear
 		time.sleep(1)
 
-		# now other tests can be notified by udev
+		# now other tests can be launched
 		global_lock.release()
 
 		if self.hid_replay.wait():
@@ -479,6 +481,14 @@ def run_tests(list_of_hid_files, database, skipping_db):
 	global total_tests_count, skipped
 	threads = []
 	total_tests_count = len(list_of_hid_files)
+	# create udev notification system
+	monitor = pyudev.Monitor.from_netlink(pyudev.Context())
+	monitor.filter_by('input')
+	monitor.filter_by('hid')
+	observer = pyudev.MonitorObserver(monitor, udev_event)
+	# start monitoring udev events
+	observer.start()
+
 	for file in list_of_hid_files:
 		if skip_test(file, skipping_db):
 			skipped.append(file)

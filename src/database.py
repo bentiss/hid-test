@@ -189,8 +189,8 @@ class HIDTestDatabase(object):
 		self.skipped.sort()
 		return self.skipped
 
-	def set_actual_hid_list(self, list_of_hid_files):
-		self.total_tests_count = len(list_of_hid_files)
+	def incr_total_tests_count(self, n):
+		self.total_tests_count += n
 
 	def __getitem__(self, item):
 		return self.database[item]

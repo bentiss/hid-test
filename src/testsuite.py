@@ -84,6 +84,8 @@ def run_check(list_of_ev_files, database, delta_timestamp):
 
 	hid_files_in_db = database.get_hid_files()
 
+	tests = []
+
 	for short_hid_file in hid_files:
 		hid_file = short_hid_file
 		for full_path in hid_files_in_db:
@@ -92,14 +94,18 @@ def run_check(list_of_ev_files, database, delta_timestamp):
 				break
 		expected = database.get_expected(hid_file)
 		results = evemu_outputs[short_hid_file]
+		tests.append((hid_file, expected, results))
 
+	database.incr_total_tests_count(len(tests))
+
+	for hid_file, expected, results in tests:
 		dummy = HIDBase()
 		compare = Compare(hid_file, expected, results, database, delta_timestamp, dummy)
 		compare.run()
 
 def run_tests(list_of_hid_files, database, simple_evemu_mode, delta_timestamp):
 	threads = []
-	database.set_actual_hid_list(list_of_hid_files)
+	database.incr_total_tests_count(len(list_of_hid_files))
 	# create udev notification system
 	monitor = pyudev.Monitor.from_netlink(pyudev.Context())
 	monitor.filter_by('input')

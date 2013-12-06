@@ -49,6 +49,7 @@ def help(argv):
 	-h	print the help message.
 	-jN	Launch N threads in parallel. This reduce the global time of the tests,
 		but corrupts the timestamps between frames.
+	-kKVER	overwritte the current kernel version
 	-tS	Print a warning if the timestamps between two frames is greater than S.
 		Example: "-t0.01".
 		If S is 0, then timestamps are ignored (default behavior).
@@ -111,10 +112,11 @@ def main():
 	fast_mode = False
 	simple_evemu_mode = False
 	delta_timestamp = 0
+	kernel_release = os.uname()[2]
 	# disable stdout buffering
 	sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
-	optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:t:fdE')
+	optlist, args = getopt.gnu_getopt(sys.argv[1:], 'hj:k:t:fdE')
 	for opt, arg in optlist:
 		if opt == '-h':
 			help(sys.argv)
@@ -126,6 +128,8 @@ def main():
 			if HIDThread.count < 1:
 				print "the number of threads can not be less than one. Disabling threading launches."
 				HIDThread.count = 1
+		elif opt == '-k':
+			kernel_release = arg
 		elif opt == '-E':
 			simple_evemu_mode = True
 		elif opt == '-f':
@@ -140,8 +144,6 @@ def main():
 	rootdir = '.'
 	if len(args) > 0:
 		rootdir = args[0]
-
-	kernel_release = os.uname()[2]
 
 	database = HIDTestDatabase(rootdir, kernel_release, fast_mode)
 	hid_files = database.get_hid_files()

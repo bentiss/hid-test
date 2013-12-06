@@ -46,6 +46,10 @@ OPTIONS
 	Launch N threads in parallel. This reduce the global time of the tests,
 	but corrupts the timestamps between frames.
 
+*-kKVER*::
+	Overwritte the current kernel release. Useful if we want to test against
+	a specific expected result.
+
 *-tS*::
 	Print a warning if the timestamps between two frames is greater than S.
 	If S is 0, then timestamps are ignored (default behavior).

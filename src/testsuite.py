@@ -89,7 +89,7 @@ def run_check(list_of_ev_files, database, delta_timestamp):
 	for short_hid_file in hid_files:
 		hid_file = short_hid_file
 		for full_path in hid_files_in_db:
-			if short_hid_file in full_path:
+			if os.path.basename(short_hid_file) in full_path:
 				hid_file = full_path
 				break
 		expected = database.get_expected(hid_file)

@@ -51,7 +51,9 @@ skipped = []
 tests = []
 
 def udev_event(action, device):
-	if 'event' in device.sys_name:
+	if ":" in device.sys_name:
+		HIDTest.hid_udev_event(action, device)
+	elif 'event' in device.sys_name:
 		HIDTest.event_udev_event(action, device)
 
 def get_major_minor(string = os.uname()[2]):
@@ -67,7 +69,9 @@ def get_major_minor(string = os.uname()[2]):
 class HIDTest(object):
 	running = True
 
+	instances = []
 	current = None
+	uhid_mappings = {}
 	event_mappings = {}
 
 	def __init__(self, path, delta_timestamp, expected):
@@ -86,6 +90,7 @@ class HIDTest(object):
 		self.cv = threading.Condition()
 		self.outs = []
 		self.condition_op = False
+		self.hid_name = None
 
 	def dump_outs(self):
 		hid_name = os.path.splitext(os.path.basename(self.path))[0]
@@ -136,6 +141,11 @@ class HIDTest(object):
 		global_lock.release()
 
 	@classmethod
+	def hid_udev_event(cls, action, device):
+		for instance in cls.instances:
+			instance.__hid_udev_event(action, device)
+
+	@classmethod
 	def event_udev_event(cls, action, device):
 		# we maintain an association event node / uhid node
 		if not cls.event_mappings.has_key(device.sys_path):
@@ -144,6 +154,19 @@ class HIDTest(object):
 
 		if action == "remove":
 			del(cls.event_mappings[device.sys_path])
+
+	def __hid_udev_event(self, action, device):
+		if not action == "add":
+			return
+
+		if self.hid_name:
+			# not our business
+			return
+
+		# the uhid node has been created
+		self.hid_name = device.sys_name
+
+		HIDTest.uhid_mappings[self.hid_name] = self
 
 	def __event_udev_event(self, action, device):
 #		print action, device, device.sys_name
@@ -217,6 +240,7 @@ class HIDTest(object):
 			global_lock.release()
 			return -1
 
+		HIDTest.instances.append(self)
 		# we accept adding new event nodes
 		HIDTest.current = self
 
@@ -247,6 +271,10 @@ class HIDTest(object):
 		while len(self.nodes.keys()) > 0:
 			self.cv.wait()
 		self.cv.release()
+
+		global_lock.acquire()
+		HIDTest.instances.remove(self)
+		global_lock.release()
 
 		# retrieve the different captures
 		for sys_name, name, out in self.nodes_ready:

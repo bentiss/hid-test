@@ -74,11 +74,8 @@ class HIDTest(object):
 	uhid_mappings = {}
 	event_mappings = {}
 
-	def __init__(self, path, delta_timestamp, expected):
+	def __init__(self, path):
 		self.path = path
-		self.delta_timestamp = delta_timestamp
-		self.expected = expected
-
 		self.condition = threading.Condition()
 
 		self.reset()
@@ -105,40 +102,9 @@ class HIDTest(object):
 				expected.write(l)
 		return outfiles
 
-	def dump_diffs(self):
-		hid_name = os.path.splitext(os.path.basename(self.path))[0]
-		outfiles = []
-		for i in xrange(len(self.outs)):
-			ev_name = hid_name + '_res_' + str(i) + ".evd"
-			outfiles.append(ev_name)
-			compare_evemu.dump_diff(ev_name, self.outs[i])
-		if not self.expected:
-			return outfiles
-		for i in xrange(len(self.expected)):
-			ev_name = hid_name + '_exp_' + str(i) + ".evd"
-			outfiles.append(ev_name)
-			expect = open(self.expected[i], 'r')
-			compare_evemu.dump_diff(ev_name, expect)
-			expect.close()
-		return outfiles
-
-	def compare_result(self, str_result):
-		return compare_evemu.compare_sets(self.expected, self.outs, str_result, self.delta_timestamp)
-
 	def terminate(self):
 		if self.hid_replay :
 			self.hid_replay.terminate()
-
-	def append_result(self, str_result, result, warning):
-		global_lock.acquire()
-		# append the result of the test to the list,
-		tests.append((self.path, (result, warning)))
-
-		str_result.append(get_results_count(tests, None))
-		str_result.append("-" * raw_length)
-
-		print '\n'.join(str_result)
-		global_lock.release()
 
 	@classmethod
 	def hid_udev_event(cls, action, device):
@@ -231,7 +197,10 @@ class HIDTest(object):
 			self.cv.notify()
 			self.cv.release()
 
-	def run(self):
+	def print_launch(self):
+		print "launching test", self.path
+
+	def run_test(self):
 		self.reset()
 		# acquire the lock so that only this test will get the udev 'add' notifications
 		global_lock.acquire()
@@ -244,7 +213,7 @@ class HIDTest(object):
 		# we accept adding new event nodes
 		HIDTest.current = self
 
-		print "launching test", self.path, "against", self.expected
+		self.print_launch()
 		self.hid_replay = subprocess.Popen(shlex.split(hid_replay + " -s 1 -1 " + self.path))
 
 		# wait for one input node to be created
@@ -280,6 +249,62 @@ class HIDTest(object):
 		for sys_name, name, out in self.nodes_ready:
 			self.outs.append(out)
 
+	def close(self):
+		for out in self.outs:
+			out.close()
+		self.outs = []
+
+	def run(self):
+		self.run_test()
+
+		self.dump_outs()
+
+		# close the captures so that the tmpfiles are destroyed
+		self.close()
+		return 0
+
+class HIDTestAndCompare(HIDTest):
+	def __init__(self, path, delta_timestamp, expected):
+		super(HIDTestAndCompare, self).__init__(path)
+		self.delta_timestamp = delta_timestamp
+		self.expected = expected
+
+	def dump_diffs(self):
+		hid_name = os.path.splitext(os.path.basename(self.path))[0]
+		outfiles = []
+		for i in xrange(len(self.outs)):
+			ev_name = hid_name + '_res_' + str(i) + ".evd"
+			outfiles.append(ev_name)
+			compare_evemu.dump_diff(ev_name, self.outs[i])
+		if not self.expected:
+			return outfiles
+		for i in xrange(len(self.expected)):
+			ev_name = hid_name + '_exp_' + str(i) + ".evd"
+			outfiles.append(ev_name)
+			expect = open(self.expected[i], 'r')
+			compare_evemu.dump_diff(ev_name, expect)
+			expect.close()
+		return outfiles
+
+	def compare_result(self, str_result):
+		return compare_evemu.compare_sets(self.expected, self.outs, str_result, self.delta_timestamp)
+
+	def append_result(self, str_result, result, warning):
+		global_lock.acquire()
+		# append the result of the test to the list,
+		tests.append((self.path, (result, warning)))
+
+		str_result.append(get_results_count(tests, None))
+		str_result.append("-" * raw_length)
+
+		print '\n'.join(str_result)
+		global_lock.release()
+
+	def print_launch(self):
+		print "launching test", self.path, "against", self.expected
+
+	def run(self):
+		self.run_test()
 		basename = os.path.basename(self.path)
 		name_length = len(basename) + 2
 		prev = (raw_length - name_length) / 2
@@ -303,8 +328,7 @@ class HIDTest(object):
 			str_result.append("success")
 
 		# close the captures so that the tmpfiles are destroyed
-		for out in self.outs:
-			out.close()
+		self.close()
 
 		# append the result of the test to the list,
 		# we only count the warning if the test passed
@@ -388,7 +412,7 @@ class HIDThread(threading.Thread):
 		HIDThread.lock.release()
 		self.daemon = True
 
-		self.hid = HIDTest(file, delta_timestamp, expected)
+		self.hid = HIDTestAndCompare(file, delta_timestamp, expected)
 
 	def run(self):
 		HIDThread.sema.acquire()
@@ -529,7 +553,7 @@ def run_tests(list_of_hid_files, database, skipping_db):
 			thread = HIDThread(file, delta_timestamp, expected)
 			threads.append(thread)
 			thread.start()
-		elif HIDTest(file, delta_timestamp, expected).run() < 0:
+		elif HIDTestAndCompare(file, delta_timestamp, expected).run() < 0:
 			break
 	while len(threads) > 0:
 		try:

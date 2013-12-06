@@ -28,7 +28,7 @@ import subprocess
 import shlex
 import getopt
 import re
-from hid_test import HIDTest, HIDTestAndCompare, HIDThread
+from hid_test import HIDTest, HIDTestAndCompare, HIDThread, HIDBase, Compare
 from database import HIDTestDatabase
 
 context = pyudev.Context()
@@ -65,6 +65,37 @@ def start_xi2detach():
 	import time
 	time.sleep(1)
 	return xi2detach
+
+def run_check(list_of_ev_files, database, delta_timestamp):
+	# evemu_outputs contains a key matching a hid file, and the results
+	evemu_outputs = {}
+	regex = re.compile("(.*)_[0-9]+\.ev")
+	for ev in list_of_ev_files:
+		key = ev[:-3] + ".hid"
+		m = regex.match(ev)
+		if m:
+			key = m.group(1) + ".hid"
+		if not evemu_outputs.has_key(key):
+			evemu_outputs[key] = []
+		evemu_outputs[key].append(ev)
+
+	hid_files = evemu_outputs.keys()
+	hid_files.sort()
+
+	hid_files_in_db = database.get_hid_files()
+
+	for short_hid_file in hid_files:
+		hid_file = short_hid_file
+		for full_path in hid_files_in_db:
+			if short_hid_file in full_path:
+				hid_file = full_path
+				break
+		expected = database.get_expected(hid_file)
+		results = evemu_outputs[short_hid_file]
+
+		dummy = HIDBase()
+		compare = Compare(hid_file, expected, results, database, delta_timestamp, dummy)
+		compare.run()
 
 def run_tests(list_of_hid_files, database, simple_evemu_mode, delta_timestamp):
 	threads = []
@@ -150,20 +181,29 @@ def main():
 
 	# if specific devices are given, treat them, otherwise, run the test on all .hid
 	list_of_hid_files = hid_files
+	list_of_evemu_files = []
 	if len(args) > 1:
-		list_of_hid_files = args[1:]
-	if len(list_of_hid_files) == 0:
+		files = args[1:]
+		list_of_hid_files = [ f for f in files if f.endswith(".hid") ]
+		list_of_evemu_files = [ f for f in files if f.endswith(".ev") ]
+
+	if len(list_of_hid_files) + len(list_of_evemu_files) == 0:
 		help(sys.argv)
 		sys.exit(1)
 
-	xi2detach = start_xi2detach()
+	if len(list_of_hid_files) > 0:
+		xi2detach = start_xi2detach()
 
 	try:
-		run_tests(list_of_hid_files, database, simple_evemu_mode, delta_timestamp)
+		if len(list_of_hid_files) > 0:
+			run_tests(list_of_hid_files, database, simple_evemu_mode, delta_timestamp)
+		if len(list_of_evemu_files) > 0:
+			run_check(list_of_evemu_files, database, delta_timestamp)
 	finally:
 		if not simple_evemu_mode:
 			database.report_results()
-		xi2detach.terminate()
+		if len(list_of_hid_files) > 0:
+			xi2detach.terminate()
 
 if __name__ == "__main__":
 	main()

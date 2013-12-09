@@ -180,6 +180,10 @@ class HIDTestDatabase(object):
 				if skip:
 					self.skipping_db.append(hid_file)
 
+	def append_hid_file(self, filename):
+		if not self.has_key(filename):
+			self.database[filename] = []
+
 	def get_hid_files(self):
 		keys = self.database.keys()
 		keys.sort()

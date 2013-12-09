@@ -92,6 +92,8 @@ def run_check(list_of_ev_files, database, delta_timestamp):
 			if os.path.basename(short_hid_file) in full_path:
 				hid_file = full_path
 				break
+		if not database.has_key(hid_file):
+			database.append_hid_file(hid_file)
 		expected = database.get_expected(hid_file)
 		results = evemu_outputs[short_hid_file]
 		tests.append((hid_file, expected, results))
@@ -118,8 +120,7 @@ def run_tests(list_of_hid_files, database, simple_evemu_mode, delta_timestamp):
 		if database.skip_test(file):
 			continue
 		if not database.has_key(file):
-			# TODO: failure
-			continue
+			database.append_hid_file(file)
 		if HIDThread.count > 1:
 			thread = HIDThread(file, database, delta_timestamp, simple_evemu_mode)
 			threads.append(thread)

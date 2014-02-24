@@ -75,9 +75,10 @@ def run_check(list_of_ev_files, database, delta_timestamp):
 		m = regex.match(ev)
 		if m:
 			key = m.group(1) + ".hid"
-		if not evemu_outputs.has_key(key):
-			evemu_outputs[key] = []
-		evemu_outputs[key].append(ev)
+		if not database.skip_test(key):
+			if not evemu_outputs.has_key(key):
+				evemu_outputs[key] = []
+			evemu_outputs[key].append(ev)
 
 	hid_files = evemu_outputs.keys()
 	hid_files.sort()

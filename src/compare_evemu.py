@@ -238,6 +238,10 @@ class EvemuFile(object):
 		elif line.startswith("I: "):
 			self.parse_ids(line[3:])
 			return
+		elif line.startswith("B: "):
+			if line.endswith("00 00 00 00 00 00 00 00"):
+				return
+			self.extra_descr.append(line)
 		else:
 			self.extra_descr.append(line)
 
